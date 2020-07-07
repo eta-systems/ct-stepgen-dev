@@ -60,7 +60,3 @@ uint8_t ADS125X_Register_Read(uint8_t reg, uint8_t* pData){
   // HAL_SPI_Transmit();
 
 }
-
-uint8_t ADS125X_Register_Write(uint8_t reg, uint8_t* pData)
-
-

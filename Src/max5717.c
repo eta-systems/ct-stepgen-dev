@@ -6,6 +6,7 @@
  * @version     1.0
  * @author      Simon Burkhardt
  * @date        2020.05.22
+ * @see         https://github.com/hellange/max5719/blob/master/src/main.cpp
  * @copyright   (c) 2020 eta systems GmbH
 *******************************************************************************/
 
@@ -13,25 +14,105 @@
 #include "max5717.h"
 
 
+
+
+void gaggi(fuck_t* a){
+	HAL_GPIO_TogglePin(a->csPort, a->csPin);
+	HAL_Delay(1000);
+}
+
+
+
 /**  MSB
   * [ 7  6  5  4  3  2  1  0]:[ 7  6  5  4  3  2  1  0]:[ 7  6  5  4  3  2  1  0]
   *  19 18 17 16 15 14 13 12   11 10 09 08 07 06 05 04   03 02 01 00  x  x  x  x
   */
 
-void MAX5719_VoltageToCode(float volt, uint8_t* pBytes, uint8_t len){
-    float fltCode = volt * ((float)MAX5717_CODE_MAX) / MAX5717_VREF;
-    if(fltCode < 0.0f) fltCode = 0.0f;
-    uint32_t code = (uint32_t)fltCode;
+uint32_t MAX5719_VoltageToCode(MAX5717_t *hdac, float volt)
+{
+  float fltCode = 0.0f;
+  fltCode = volt * ((float)MAX5719_CODE_MAX) / hdac->vref;
+  if(fltCode < 0.0f) fltCode = 0.0f;
+  uint32_t code = (uint32_t)fltCode;
+  if(code > MAX5719_CODE_MAX) code = MAX5719_CODE_MAX;
+  return code;
 
-    #ifndef MAX5719
-    code = (code << 4) & 0x00FFFFF0;
-    #endif
+/*  // why??
+  #ifndef MAX5719
+  code = (code << 4) & 0x00FFFFF0;
+  #endif
+*/
 
-    uint8_t payload[MAX5717_DATA_LENGTH];
-    for(uint8_t i=0; (i<MAX5717_DATA_LENGTH) && (i<len); i++){
-        payload[i] = 1;
-    }
+  /*
+  uint8_t payload[MAX5717_DATA_LENGTH];
+  for(uint8_t i=0; (i<MAX5717_DATA_LENGTH) && (i<len); i++){
+      payload[i] = 1;
+  }
+  */
+}
+
+/**
+  * @brief  initializes the DAC on the MCU side and sets CS/Latch pins to default state
+  * @param  *hdac pointer to DAC handle
+  * @param  *hspi pointer to HAL SPI interface handle
+  * @param  vref floating point value of analog reference voltage
+  * @see    Datasheet 1. 16-Bit Serial Interface Timing Diagram
+  */
+uint8_t MAX5717_Init(MAX5717_t *hdac, SPI_HandleTypeDef *hspi, float vref)
+{
+  hdac->vref = vref;
+	hdac->hspix = hspi;
+	
+	// Datasheet 1. 16-Bit Serial Interface Timing Diagram
+	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_SET);        // !CS --> inverting
+	HAL_GPIO_WritePin(hdac->latchPort, hdac->latchPin, GPIO_PIN_SET);  // !LATCH --> inverting
+	
 }
 
 
+/**
+  * @brief  sets a floating point voltage to the output of the DAC
+  * @param  *hdac pointer to DAC handle
+  * @param  volt floating point value of analog output voltage
+  * @see    Datasheet 1. 16-Bit Serial Interface Timing Diagram
+  */
+uint8_t MAX5717_SetVoltage(MAX5717_t *hdac, float volt)
+{
+  uint32_t code = MAX5719_VoltageToCode(hdac, volt);
 
+#ifdef USE_MAX5719
+
+  uint32_t data2 = code << 4;  // shift by 4, Table 2. 20-bit SPI DAC Register Table
+  uint8_t payload[3];
+  payload[0] = (uint8_t)((data2 >> 16) & 0xFF);
+  payload[1] = (uint8_t)((data2 >> 8) & 0xFF);
+  payload[2] = (uint8_t)((data2 >>  0) & 0xFF);
+
+#else
+
+  uint8_t payload[2]
+  payload[0] = (uint8_t)((data2 >> 16) & 0xFF);
+  payload[1] = (uint8_t)((data2 >> 8) & 0xFF);
+
+#endif
+
+	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_RESET); // chip select
+#ifdef USE_MAX5719
+	HAL_SPI_Transmit(hdac->hspix, payload, 3, 10);  // 3 bytes
+#else
+	HAL_SPI_Transmit(hdac->hspix, payload, 2, 10);  // 2 bytes
+#endif
+	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_SET); // chip un-select
+	HAL_GPIO_WritePin(hdac->latchPort, hdac->latchPin, GPIO_PIN_RESET); // latch low
+	// here: t_LDPW > 20ns
+	// f_cpu = 216 MHz --> t_clk = 4.6ns
+	__nop();
+	__nop();
+	__nop();
+	__nop();
+	__nop();
+	__nop();
+	HAL_GPIO_WritePin(hdac->latchPort, hdac->latchPin, GPIO_PIN_SET); // latch high
+	
+  return 0;
+}

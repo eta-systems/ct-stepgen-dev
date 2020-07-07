@@ -58,16 +58,30 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define R5mA_ON_Pin GPIO_PIN_2
+#define R5mA_ON_GPIO_Port GPIOE
+#define R5mA_OFF_Pin GPIO_PIN_4
+#define R5mA_OFF_GPIO_Port GPIOE
 #define USER_Btn_Pin GPIO_PIN_13
 #define USER_Btn_GPIO_Port GPIOC
+#define USER_Btn_EXTI_IRQn EXTI15_10_IRQn
+#define SPI3_CS_Pin GPIO_PIN_6
+#define SPI3_CS_GPIO_Port GPIOF
+#define SPI3_DRDY_Pin GPIO_PIN_7
+#define SPI3_DRDY_GPIO_Port GPIOF
+#define SPI3_DRDY_EXTI_IRQn EXTI9_5_IRQn
+#define R25A_ON_Pin GPIO_PIN_8
+#define R25A_ON_GPIO_Port GPIOF
+#define R25A_OFF_Pin GPIO_PIN_9
+#define R25A_OFF_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
-#define ADCSync_Pin GPIO_PIN_11
-#define ADCSync_GPIO_Port GPIOB
-#define ADC_I_CS_Pin GPIO_PIN_12
-#define ADC_I_CS_GPIO_Port GPIOB
+#define SPI4_LATCH_Pin GPIO_PIN_10
+#define SPI4_LATCH_GPIO_Port GPIOE
+#define SPI4_CS_Pin GPIO_PIN_15
+#define SPI4_CS_GPIO_Port GPIOE
 #define LD3_Pin GPIO_PIN_14
 #define LD3_GPIO_Port GPIOB
 #define STLK_RX_Pin GPIO_PIN_8
@@ -78,14 +92,19 @@ void Error_Handler(void);
 #define USB_PowerSwitchOn_GPIO_Port GPIOG
 #define USB_OverCurrent_Pin GPIO_PIN_7
 #define USB_OverCurrent_GPIO_Port GPIOG
-#define I_DReady_Pin GPIO_PIN_7
-#define I_DReady_GPIO_Port GPIOC
+#define SPI1_SYNC_Pin GPIO_PIN_11
+#define SPI1_SYNC_GPIO_Port GPIOA
+#define SPI1_DRDY_Pin GPIO_PIN_12
+#define SPI1_DRDY_GPIO_Port GPIOA
+#define SPI1_DRDY_EXTI_IRQn EXTI15_10_IRQn
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
 #define SW0_Pin GPIO_PIN_3
 #define SW0_GPIO_Port GPIOB
+#define SPI1_CS_Pin GPIO_PIN_6
+#define SPI1_CS_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_7
 #define LD2_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
