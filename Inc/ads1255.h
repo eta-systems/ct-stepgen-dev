@@ -41,18 +41,28 @@ SOFTWARE.
 extern "C" {
 #endif
 
-#ifndef STM32F4XX_H
-#include "stm32f7xx_hal.h"
-#endif
+#define STM32F7
 
-#ifndef STM32F4XX_HAL_I2C_H
+#if defined(STM32F1)
+#include "stm32f1xx_hal.h"
+#include "stm32f1xx_hal_spi.h"
+#elif defined(STM32F4)
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal_spi.h"
+#elif defined(STM32L4)
+#include "stm32l4xx_hal.h"
+#include "stm32l4xx_hal_spi.h"
+#elif defined(STM32F3)
+#include "stm32f3xx_hal.h"
+#include "stm32f3xx_hal_spi.h"
+#elif defined(STM32F7)
+#include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_spi.h"
 #endif
 
 // reference voltage
 #define ADS125X_VREF (2.5f)
 #define ADS125X_OSC_FREQ (7680000)
-
 
 /*
 const defaults = {
@@ -100,13 +110,10 @@ const defaults = {
 #define ADS125X_BUFON   0x02
 #define ADS125X_BUFOFF  0x00
 
-#define ADS125X_PGA1    0x00
-#define ADS125X_PGA2    0x01
-#define ADS125X_PGA4    0x02
-#define ADS125X_PGA8    0x03
-#define ADS125X_PGA16   0x04
-#define ADS125X_PGA32   0x05
-#define ADS125X_PGA64   0x06
+#define ADS125X_CLKOUT_OFF     0x00
+#define ADS125X_CLKOUT_1       0x20
+#define ADS125X_CLKOUT_HALF    0x40
+#define ADS125X_CLKOUT_QUARTER 0x60
 
 #define ADS125X_RDATA     0x01    /* Read Data */
 #define ADS125X_RDATAC    0x03    /* Read Data Continuously */
@@ -145,41 +152,68 @@ const defaults = {
 #define ADS125X_MUXN_AINCOM 0x08
 
 // gain codes
-#define ADS125X_GAIN_1 0x00
-#define ADS125X_GAIN_2 0x01
-#define ADS125X_GAIN_4 0x02
-#define ADS125X_GAIN_8 0x03
-#define ADS125X_GAIN_16 0x04
-#define ADS125X_GAIN_32 0x05
-#define ADS125X_GAIN_64 0x06
-
+#define ADS125X_PGA1    0x00
+#define ADS125X_PGA2    0x01
+#define ADS125X_PGA4    0x02
+#define ADS125X_PGA8    0x03
+#define ADS125X_PGA16   0x04
+#define ADS125X_PGA32   0x05
+#define ADS125X_PGA64   0x06
 
 // data rate codes
 /** @note: Data Rate vary depending on crystal frequency. 
   * Data rates listed below assumes the crystal frequency is 7.68Mhz
   * for other frequency consult the datasheet.
   */
+#define ADS125X_DRATE_30000SPS 0xF0
+#define ADS125X_DRATE_15000SPS 0xE0
+#define ADS125X_DRATE_7500SPS 0xD0
+#define ADS125X_DRATE_3750SPS 0xC0
+#define ADS125X_DRATE_2000SPS 0xB0
+#define ADS125X_DRATE_1000SPS 0xA1
+#define ADS125X_DRATE_500SPS 0x92
+#define ADS125X_DRATE_100SPS 0x82
+#define ADS125X_DRATE_60SPS 0x72
+#define ADS125X_DRATE_50SPS 0x63
+#define ADS125X_DRATE_30SPS 0x53
+#define ADS125X_DRATE_25SPS 0x43
+#define ADS125X_DRATE_15SPS 0x33
+#define ADS125X_DRATE_10SPS 0x23
+#define ADS125X_DRATE_5SPS 0x13
+#define ADS125X_DRATE_2_5SPS 0x03
 
-#define ADS1256_DRATE_30000SPS 0xF0
-#define ADS1256_DRATE_15000SPS 0xE0
-#define ADS1256_DRATE_7500SPS 0xD0
-#define ADS1256_DRATE_3750SPS 0xC0
-#define ADS1256_DRATE_2000SPS 0xB0
-#define ADS1256_DRATE_1000SPS 0xA1
-#define ADS1256_DRATE_500SPS 0x92
-#define ADS1256_DRATE_100SPS 0x82
-#define ADS1256_DRATE_60SPS 0x72
-#define ADS1256_DRATE_50SPS 0x63
-#define ADS1256_DRATE_30SPS 0x53
-#define ADS1256_DRATE_25SPS 0x43
-#define ADS1256_DRATE_15SPS 0x33
-#define ADS1256_DRATE_10SPS 0x23
-#define ADS1256_DRATE_5SPS 0x13
-#define ADS1256_DRATE_2_5SPS 0x03
+// Struct "Object"
+typedef struct {
+    SPI_HandleTypeDef *hspix;
+    float vref;
+    uint8_t pga;
+    float convFactor;
+    uint32_t oscFreq;
+    GPIO_TypeDef csPort;
+    uint16_t     csPin;
+    GPIO_TypeDef drdyPort;
+    uint16_t     drdyPin;
+} ADS125X_t;
+
+uint8_t  ADS125X_CS              (ADS125X_t *ads, uint8_t on);
+uint8_t  ADS125X_DRDY_Wait       (ADS125X_t *ads );
+uint8_t  ADS125X_Init            (ADS125X_t *ads, SPI_HandleTypeDef *hspi, uint8_t drate, uint8_t gain, uint8_t buffer_en);
+uint8_t  ADS125X_Register_Read   (ADS125X_t *ads, uint8_t reg, uint8_t* pData, uint8_t n);
+uint8_t  ADS125X_Register_Write  (ADS125X_t *ads, uint8_t reg, uint8_t data);
+uint8_t  ADS125X_CMD_Send        (ADS125X_t *ads, uint8_t cmd);
+void     ADS125X_ADC_Code2Volt   (ADS125X_t *ads, int32_t *pCode, float *pVolt, uint16_t size);
+float    ADS125X_ADC_ReadVolt    (ADS125X_t *ads);
+
+void     ADS125X_Channel_Set     (ADS125X_t *ads, int8_t chan);
+uint8_t  ADS125X_ChannelDiff_Set (ADS125X_t *ads, int8_t p_chan, int8_t n_chan);
+// float    ADS125X_Read_Channel    (ADS125X_t *ads );
+
+uint8_t  ADS125X_Delay_Cycles    (ADS125X_t *ads, uint32_t cycles);
+uint32_t ADS125X_read_uint24     (ADS125X_t *ads );
+uint32_t ADS125X_read_uint32     (ADS125X_t *ads );
+float    ADS125X_read_float32    (ADS125X_t *ads );
 
 
-uint8_t ADS125X_Register_Read(uint8_t reg, uint8_t* pData);
-uint8_t ADS125X_Register_Write(uint8_t reg, uint8_t* pData);
 
 #endif	/* ADS1255_H */
 

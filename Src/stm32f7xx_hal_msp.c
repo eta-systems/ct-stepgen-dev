@@ -200,7 +200,10 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     hdma_spi3_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_spi3_rx.Init.Mode = DMA_NORMAL;
     hdma_spi3_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-    hdma_spi3_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    hdma_spi3_rx.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+    hdma_spi3_rx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
+    hdma_spi3_rx.Init.MemBurst = DMA_MBURST_SINGLE;
+    hdma_spi3_rx.Init.PeriphBurst = DMA_PBURST_SINGLE;
     if (HAL_DMA_Init(&hdma_spi3_rx) != HAL_OK)
     {
       Error_Handler();
@@ -266,9 +269,12 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     hdma_spi4_rx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_spi4_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_spi4_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_spi4_rx.Init.Mode = DMA_NORMAL;
+    hdma_spi4_rx.Init.Mode = DMA_CIRCULAR;
     hdma_spi4_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-    hdma_spi4_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    hdma_spi4_rx.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+    hdma_spi4_rx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
+    hdma_spi4_rx.Init.MemBurst = DMA_MBURST_SINGLE;
+    hdma_spi4_rx.Init.PeriphBurst = DMA_PBURST_SINGLE;
     if (HAL_DMA_Init(&hdma_spi4_rx) != HAL_OK)
     {
       Error_Handler();
@@ -287,7 +293,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     hdma_spi4_tx.Init.Mode = DMA_CIRCULAR;
     hdma_spi4_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
     hdma_spi4_tx.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
-    hdma_spi4_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+    hdma_spi4_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
     hdma_spi4_tx.Init.MemBurst = DMA_MBURST_SINGLE;
     hdma_spi4_tx.Init.PeriphBurst = DMA_PBURST_SINGLE;
     if (HAL_DMA_Init(&hdma_spi4_tx) != HAL_OK)

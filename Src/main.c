@@ -37,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DMA_BUFFER_SIZE 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -61,6 +61,10 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 MAX5717_t dac1;
+ADS125X_t adcv;
+ADS125X_t adci;
+
+uint32_t dmaDacTx [ DMA_BUFFER_SIZE ];
 
 /* USER CODE END PV */
 
@@ -138,25 +142,52 @@ int main(void)
 	printf("2.476.101.01 Step Generator for Curve Tracer\n");
 	printf("(c)2020 - eta systems GmbH\n");
 	
-	dac1.csPort = SPI4_CS_GPIO_Port;
-	dac1.csPin = SPI4_CS_Pin;
+	ETA_CTGS_OutputOff();
+	
+	dac1.csPort    = SPI4_CS_GPIO_Port;
+	dac1.csPin     = SPI4_CS_Pin;
 	dac1.latchPort = SPI4_LATCH_GPIO_Port;
-	dac1.latchPin = SPI4_LATCH_Pin;
-	
+	dac1.latchPin  = SPI4_LATCH_Pin;
+	printf("config MAX5719...");
 	MAX5717_Init(&dac1, &hspi4, 4.0965f);
+	printf("done\n");
 	
-	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_RESET);
-
-	uint32_t t=0;
-	float Ts = 0.0001f;
-	float f = 50;
-	float A = 4.096f/2.0f;
-	uint32_t k = 0;
+	adci.csPort   = *SPI1_CS_GPIO_Port;
+	adci.csPin    =  SPI1_CS_Pin;
+	adci.drdyPort = *SPI1_DRDY_GPIO_Port;
+	adci.drdyPin  =  SPI1_DRDY_Pin;
+	adci.vref = 2.5f;
+	adci.hspix = &hspi1;
+	printf("config ADS1256...");
+	//ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	printf("done\n");
+	
+	adcv.csPort   = *SPI3_CS_GPIO_Port;
+	adcv.csPin    =  SPI3_CS_Pin;
+	adcv.drdyPort = *SPI3_DRDY_GPIO_Port;
+	adcv.drdyPin  =  SPI3_DRDY_Pin;
+	adcv.vref = 2.5f;
+	adcv.hspix = &hspi3;
+	printf("config ADS1255...");
+	//ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	printf("done\n");
+	
 	float volts = 0.0f;
-		
+	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
+	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
+	
+	
+	uint32_t k = 0;
+	
+	float A = ((48.0f / 4.7f)/5.6f);
+	float stepsize = A/(float)DMA_BUFFER_SIZE;
+	for(uint16_t i=0; i<DMA_BUFFER_SIZE; i++){
+		volts = (i*stepsize)-(A/2.0f);
+		dmaDacTx[i] = MAX5717_VoltageToCode(&dac1, volts);
+		// printf("%.5f,\n", volts);
+		printf("%d\n", dmaDacTx[i]);
+	}
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -164,74 +195,14 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-		
-		/* USER CODE BEGIN 3 */
-		volts = A*(1+ sin(2*PI*f*(float)k*Ts));
-		MAX5717_SetVoltage(&dac1, volts);
+		//volts = 2.048*(sin(2*PI*f*(float)k*Ts));
+		//volts = ((float)(1500*k%0xfffff))/((float)0xfffff) * A - (A/2.0f);
+		// MAX5717_SetVoltage(&dac1, volts);
+		MAX5717_SendCode(&dac1, dmaDacTx[k%DMA_BUFFER_SIZE]);
 		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 		k++;
-		
-		/*
-		if(k<50){
-			volts = 0.0f;
-		} else {
-			volts = 4.096f;
-		}
-		k++;
-		if(k>100) k=0;
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		MAX5717_SetVoltage(&dac1, volts);
-		HAL_Delay(10);
-		*/
-		
-		/*
-		for(uint16_t i=0; i<400; i++){
-			float volts = ((float)i)/100.0f;
-			MAX5717_SetVoltage(&dac1, volts);
-			HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-			HAL_Delay(100);
-			if((i % 50) == 0)
-				printf("%.3fV\n", volts);
-		}
-		*/
-		
-		/*
-		for(uint16_t i=0; i<5; i++){
-			float volts = ((float)i);
-			MAX5717_SetVoltage(&dac1, volts);
-			HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-			HAL_Delay(1000);
-			if((i % 1) == 0)
-				printf("%.3fV\n", volts);
-		}
-		*/
-		
-		/*
-		printf("0V\n");
-		MAX5717_SetVoltage(&dac1, 0.0f);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		HAL_Delay(5000);
-		
-		printf("1V\n");
-		MAX5717_SetVoltage(&dac1, 1.0f);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		HAL_Delay(5000);
-		
-		printf("2V\n");
-		MAX5717_SetVoltage(&dac1, 2.0f);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		HAL_Delay(5000);
-		
-		printf("3V\n");
-		MAX5717_SetVoltage(&dac1, 3.0f);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		HAL_Delay(5000);
-		
-		printf("4V\n");
-		MAX5717_SetVoltage(&dac1, 4.096f);
-		HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		HAL_Delay(5000);
-		*/
+
+    /* USER CODE BEGIN 3 */
 
   }
   /* USER CODE END 3 */

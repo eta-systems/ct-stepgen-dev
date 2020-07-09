@@ -1,33 +1,64 @@
 /*******************************************************************************
  * @file        2.476.101.01.BSP.h
- * @brief       Board Support Package (BSP) C Library for 
- *              2.476.101.01 step generator 
- * @details     This file implements the functionalities of the DAC.
+ * @brief       Board Support Package (BSP) for 2.476.101.01 curve tracer
+ * @details     This file implements constants, math and hardware specific 
+                functionalities
  * @version     1.0
  * @author      Simon Burkhardt
- * @date        2020.05.22
+ * @date        2020.07.05
  * @copyright   (c) 2020 eta systems GmbH
-*******************************************************************************/
+ * @note        2.476.101.01 step generator for curve tracer
+********************************************************************************
+*/
 
-#ifndef ETA_CT_STEP_GEN_H
-#define	ETA_CT_STEP_GEN_H
+#ifndef BSP_2_476_101_H
+#define	BSP_2_476_101_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifndef STM32F4XX_H
-#include "stm32f7xx_hal.h"
-#endif
+#define STM32F7
 
-#ifndef STM32F4XX_HAL_I2C_H
+#if defined(STM32F1)
+#include "stm32f1xx_hal.h"
+#include "stm32f1xx_hal_spi.h"
+#elif defined(STM32F4)
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal_spi.h"
+#elif defined(STM32L4)
+#include "stm32l4xx_hal.h"
+#include "stm32l4xx_hal_spi.h"
+#elif defined(STM32F3)
+#include "stm32f3xx_hal.h"
+#include "stm32f3xx_hal_spi.h"
+#elif defined(STM32F7)
+#include "stm32f7xx_hal.h"
 #include "stm32f7xx_hal_spi.h"
 #endif
 
-// #define ADC_VREF_EXT
-#define ADC_VREF_INT
+// Voltage Divider R1, R2, R3, R4
+#define ETA_CTSG_K12 ((1.0f)/(10.0f))
+#define ETA_CTSG_K34 ((1.0f)/(10.0f))
+#define ETA_CTSG_K12_corr ()
+#define ETA_CTSG_K34_corr ()
+#define ETA_CTSG_R12 (110000.0f)    // in Ohms
+#define ETA_CTSG_R34 (110000.0f)    // in Ohms
+#define ETA_CTSG_RS_5    (200.0f)   // Sense R in Ohms
+#define ETA_CTSG_RS_2500 (0.4f)     // Sense R in Ohm
+#define ETA_CTSG_RS_5_corr    (0.0f)  // calibrated correction value
+#define ETA_CTSG_RS_2500_corr (0.0f)  // calibrated correction value
+
+typedef enum { 
+	RANGE_5mA, 
+	ANGE_2500mA
+} CurrentRange_t;
+
+
+void ETA_CTGS_OutputOff(void);
 
 
 
-#endif	/* ETA_CT_STEP_GEN_H */
+
+#endif	/* BSP_2_476_101_H */
 
