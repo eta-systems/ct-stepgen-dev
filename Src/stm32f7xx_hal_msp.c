@@ -32,8 +32,6 @@ extern DMA_HandleTypeDef hdma_spi3_rx;
 
 extern DMA_HandleTypeDef hdma_spi3_tx;
 
-extern DMA_HandleTypeDef hdma_spi4_rx;
-
 extern DMA_HandleTypeDef hdma_spi4_tx;
 
 /* Private typedef -----------------------------------------------------------*/
@@ -261,27 +259,6 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
     /* SPI4 DMA Init */
-    /* SPI4_RX Init */
-    hdma_spi4_rx.Instance = DMA2_Stream3;
-    hdma_spi4_rx.Init.Channel = DMA_CHANNEL_5;
-    hdma_spi4_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_spi4_rx.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_spi4_rx.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_spi4_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_spi4_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_spi4_rx.Init.Mode = DMA_CIRCULAR;
-    hdma_spi4_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-    hdma_spi4_rx.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
-    hdma_spi4_rx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
-    hdma_spi4_rx.Init.MemBurst = DMA_MBURST_SINGLE;
-    hdma_spi4_rx.Init.PeriphBurst = DMA_PBURST_SINGLE;
-    if (HAL_DMA_Init(&hdma_spi4_rx) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    __HAL_LINKDMA(hspi,hdmarx,hdma_spi4_rx);
-
     /* SPI4_TX Init */
     hdma_spi4_tx.Instance = DMA2_Stream1;
     hdma_spi4_tx.Init.Channel = DMA_CHANNEL_4;
@@ -290,10 +267,10 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     hdma_spi4_tx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_spi4_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_spi4_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_spi4_tx.Init.Mode = DMA_CIRCULAR;
+    hdma_spi4_tx.Init.Mode = DMA_NORMAL;
     hdma_spi4_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
     hdma_spi4_tx.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
-    hdma_spi4_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
+    hdma_spi4_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
     hdma_spi4_tx.Init.MemBurst = DMA_MBURST_SINGLE;
     hdma_spi4_tx.Init.PeriphBurst = DMA_PBURST_SINGLE;
     if (HAL_DMA_Init(&hdma_spi4_tx) != HAL_OK)
@@ -387,7 +364,6 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
     HAL_GPIO_DeInit(GPIOE, GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14);
 
     /* SPI4 DMA DeInit */
-    HAL_DMA_DeInit(hspi->hdmarx);
     HAL_DMA_DeInit(hspi->hdmatx);
 
     /* SPI4 interrupt DeInit */
@@ -395,6 +371,84 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
   /* USER CODE BEGIN SPI4_MspDeInit 1 */
 
   /* USER CODE END SPI4_MspDeInit 1 */
+  }
+
+}
+
+/**
+* @brief TIM_Base MSP Initialization
+* This function configures the hardware resources used in this example
+* @param htim_base: TIM_Base handle pointer
+* @retval None
+*/
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
+{
+  if(htim_base->Instance==TIM4)
+  {
+  /* USER CODE BEGIN TIM4_MspInit 0 */
+
+  /* USER CODE END TIM4_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM4_CLK_ENABLE();
+    /* TIM4 interrupt Init */
+    HAL_NVIC_SetPriority(TIM4_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM4_IRQn);
+  /* USER CODE BEGIN TIM4_MspInit 1 */
+
+  /* USER CODE END TIM4_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM5)
+  {
+  /* USER CODE BEGIN TIM5_MspInit 0 */
+
+  /* USER CODE END TIM5_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM5_CLK_ENABLE();
+    /* TIM5 interrupt Init */
+    HAL_NVIC_SetPriority(TIM5_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM5_IRQn);
+  /* USER CODE BEGIN TIM5_MspInit 1 */
+
+  /* USER CODE END TIM5_MspInit 1 */
+  }
+
+}
+
+/**
+* @brief TIM_Base MSP De-Initialization
+* This function freeze the hardware resources used in this example
+* @param htim_base: TIM_Base handle pointer
+* @retval None
+*/
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
+{
+  if(htim_base->Instance==TIM4)
+  {
+  /* USER CODE BEGIN TIM4_MspDeInit 0 */
+
+  /* USER CODE END TIM4_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM4_CLK_DISABLE();
+
+    /* TIM4 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM4_IRQn);
+  /* USER CODE BEGIN TIM4_MspDeInit 1 */
+
+  /* USER CODE END TIM4_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM5)
+  {
+  /* USER CODE BEGIN TIM5_MspDeInit 0 */
+
+  /* USER CODE END TIM5_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM5_CLK_DISABLE();
+
+    /* TIM5 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM5_IRQn);
+  /* USER CODE BEGIN TIM5_MspDeInit 1 */
+
+  /* USER CODE END TIM5_MspDeInit 1 */
   }
 
 }

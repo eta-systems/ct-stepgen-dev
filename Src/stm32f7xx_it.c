@@ -23,6 +23,7 @@
 #include "stm32f7xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "max5717.h"
 /* USER CODE END Includes */
   
 /* Private typedef -----------------------------------------------------------*/
@@ -60,14 +61,18 @@ extern DMA_HandleTypeDef hdma_spi1_rx;
 extern DMA_HandleTypeDef hdma_spi1_tx;
 extern DMA_HandleTypeDef hdma_spi3_rx;
 extern DMA_HandleTypeDef hdma_spi3_tx;
-extern DMA_HandleTypeDef hdma_spi4_rx;
 extern DMA_HandleTypeDef hdma_spi4_tx;
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi4;
+extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim5;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
-
+extern MAX5717_t dac1;
+extern volatile uint8_t dmaDacTx[];
+extern volatile uint16_t dmaPtr;
+extern const uint16_t dmaBufferSize;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -229,9 +234,33 @@ void EXTI9_5_IRQHandler(void)
 
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
 
   /* USER CODE END EXTI9_5_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM4 global interrupt.
+  */
+void TIM4_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM4_IRQn 0 */
+	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	
+	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);
+	for(uint16_t i=0; i<128; i++);
+	HAL_SPI_Transmit_DMA(dac1.hspix, &dmaDacTx[3*dmaPtr], 3);
+	
+	dmaPtr++;
+	if(dmaPtr >= dmaBufferSize)
+		dmaPtr = 0;
+	
+  /* USER CODE END TIM4_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim4);
+  /* USER CODE BEGIN TIM4_IRQn 1 */
+
+  /* USER CODE END TIM4_IRQn 1 */
 }
 
 /**
@@ -270,7 +299,6 @@ void EXTI15_10_IRQHandler(void)
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 
   /* USER CODE END EXTI15_10_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
 
@@ -289,6 +317,20 @@ void DMA1_Stream7_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Stream7_IRQn 1 */
 
   /* USER CODE END DMA1_Stream7_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM5 global interrupt.
+  */
+void TIM5_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM5_IRQn 0 */
+
+  /* USER CODE END TIM5_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim5);
+  /* USER CODE BEGIN TIM5_IRQn 1 */
+
+  /* USER CODE END TIM5_IRQn 1 */
 }
 
 /**
@@ -311,6 +353,18 @@ void SPI3_IRQHandler(void)
 void DMA2_Stream1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream1_IRQn 0 */
+	// SPI4 DMA Complete
+	
+	for(uint16_t i=0; i<0x1fff; i++);
+	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+	
+	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_RESET);
+	for(uint16_t i=0; i<128;  i++);
+	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_SET);
+	
+	
+	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
   /* USER CODE END DMA2_Stream1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi4_tx);
@@ -331,20 +385,6 @@ void DMA2_Stream2_IRQHandler(void)
   /* USER CODE BEGIN DMA2_Stream2_IRQn 1 */
 
   /* USER CODE END DMA2_Stream2_IRQn 1 */
-}
-
-/**
-  * @brief This function handles DMA2 stream3 global interrupt.
-  */
-void DMA2_Stream3_IRQHandler(void)
-{
-  /* USER CODE BEGIN DMA2_Stream3_IRQn 0 */
-
-  /* USER CODE END DMA2_Stream3_IRQn 0 */
-  HAL_DMA_IRQHandler(&hdma_spi4_rx);
-  /* USER CODE BEGIN DMA2_Stream3_IRQn 1 */
-
-  /* USER CODE END DMA2_Stream3_IRQn 1 */
 }
 
 /**

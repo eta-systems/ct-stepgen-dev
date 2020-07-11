@@ -101,14 +101,20 @@ uint8_t MAX5717_SendCode(MAX5717_t *hdac, uint32_t code)
 	payload[0] = (uint8_t)((data2 >>  8) & 0xFF);
 	payload[1] = (uint8_t)((data2 >>  0) & 0xFF);
 #endif
-
-	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_RESET); // chip select__nop();
+	
+	/** @note
+	YES! CS must be toggled
+	LDAC allows the DACD latch to update asynchronously, by pulling LDAC 
+  low after CS goes high.  Hold LDAC high during the data loading sequence.
+	*/
+	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_RESET); // chip select
 	HAL_SPI_Transmit(hdac->hspix, payload, MAX571X_DATA_LENGTH, 10);  // 2 or 3 bytes__nop();
 	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_SET); // chip un-select
 
-	/** @note here needs to be a delay t_LDPW of at least 20ns 
-	          here: t_LDPW > 20ns
-	          f_cpu = 216 MHz --> t_clk = 4.6ns --> use 5 NOP commands to reach 20ns 
+	/** @note 
+	here needs to be a delay t_LDPW of at least 20ns 
+	here: t_LDPW > 20ns
+	f_cpu = 216 MHz --> t_clk = 4.6ns --> use 5 NOP commands to reach 20ns 
 	*/
 
 	HAL_GPIO_WritePin(hdac->latchPort, hdac->latchPin, GPIO_PIN_RESET); // latch low
