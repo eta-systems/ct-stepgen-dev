@@ -76,6 +76,12 @@ void Error_Handler(void);
 #define R25A_OFF_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
+#define SPI1_SCK_Pin GPIO_PIN_5
+#define SPI1_SCK_GPIO_Port GPIOA
+#define SPI1_MISO_Pin GPIO_PIN_6
+#define SPI1_MISO_GPIO_Port GPIOA
+#define SPI1_MOSI_Pin GPIO_PIN_7
+#define SPI1_MOSI_GPIO_Port GPIOA
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
 #define SPI4_LATCH_Pin GPIO_PIN_10
@@ -105,6 +111,12 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define SPI3_SCK_Pin GPIO_PIN_10
+#define SPI3_SCK_GPIO_Port GPIOC
+#define SPI3_MISO_Pin GPIO_PIN_11
+#define SPI3_MISO_GPIO_Port GPIOC
+#define SPI3_MOSI_Pin GPIO_PIN_12
+#define SPI3_MOSI_GPIO_Port GPIOC
 #define SW0_Pin GPIO_PIN_3
 #define SW0_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_7

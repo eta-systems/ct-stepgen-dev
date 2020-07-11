@@ -47,13 +47,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-SPI_HandleTypeDef hspi1;
-SPI_HandleTypeDef hspi3;
 SPI_HandleTypeDef hspi4;
-DMA_HandleTypeDef hdma_spi1_rx;
-DMA_HandleTypeDef hdma_spi1_tx;
-DMA_HandleTypeDef hdma_spi3_rx;
-DMA_HandleTypeDef hdma_spi3_tx;
 DMA_HandleTypeDef hdma_spi4_tx;
 
 TIM_HandleTypeDef htim4;
@@ -76,8 +70,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_SPI1_Init(void);
-static void MX_SPI3_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
@@ -140,8 +132,6 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART3_UART_Init();
-  MX_SPI1_Init();
-  MX_SPI3_Init();
   MX_SPI4_Init();
   MX_TIM4_Init();
   MX_TIM5_Init();
@@ -150,63 +140,10 @@ int main(void)
 	printf("(c)2020 - eta systems GmbH\n");
 	
 	ETA_CTGS_OutputOff();
-	HAL_TIM_Base_Start_IT(&htim4);
-	HAL_TIM_Base_Start_IT(&htim5);
-	HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 	
-	dac1.csPort    = SPI4_CS_GPIO_Port;
-	dac1.csPin     = SPI4_CS_Pin;
-	dac1.latchPort = SPI4_LATCH_GPIO_Port;
-	dac1.latchPin  = SPI4_LATCH_Pin;
-	printf("config MAX5719...");
-	MAX5717_Init(&dac1, &hspi4, 4.0965f);
-	printf("done\n");
+	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); 
+	HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
 	
-	adci.csPort   = *SPI1_CS_GPIO_Port;
-	adci.csPin    =  SPI1_CS_Pin;
-	adci.drdyPort = *SPI1_DRDY_GPIO_Port;
-	adci.drdyPin  =  SPI1_DRDY_Pin;
-	adci.vref = 2.5f;
-	adci.hspix = &hspi1;
-	printf("config ADS1256..."); HAL_Delay(1000);
-	//ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	printf("done\n");
-	
-	adcv.csPort   = *SPI3_CS_GPIO_Port;
-	adcv.csPin    =  SPI3_CS_Pin;
-	adcv.drdyPort = *SPI3_DRDY_GPIO_Port;
-	adcv.drdyPin  =  SPI3_DRDY_Pin;
-	adcv.vref = 2.5f;
-	adcv.hspix = &hspi3;
-	printf("config ADS1255...");
-	ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	printf("done\n");
-	
-	float volts = 0.0f;
-	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
-	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
-	
-	
-	uint32_t k = 0;
-	
-	float A = ((48.0f / 4.7f)/5.6f);
-	float stepsize = A/(float)DMA_BUFFER_SIZE;
-	for(uint16_t i=0; i<DMA_BUFFER_SIZE; i++){
-		volts = (i*stepsize)-(A/2.0f);
-		uint32_t code = MAX5717_VoltageToCode(&dac1, volts);
-		code = code << 4;
-		dmaDacTx[3*i]   = (uint8_t)((code >> 16) & 0xFF);
-		dmaDacTx[3*i+1] = (uint8_t)((code >>  8) & 0xFF);
-		dmaDacTx[3*i+2] = (uint8_t)((code >>  0) & 0xFF);
-		// printf("%.5f,\n", volts);
-		printf("%d\n", code);
-	}
-	
-	HAL_TIM_Base_Start_IT(&htim4);
-  // HAL_SPI_Transmit_DMA(&hspi4, dmaDacTx, 3*DMA_BUFFER_SIZE);
-
-	
-	HAL_GPIO_WritePin(SPI4_LATCH_GPIO_Port, SPI4_LATCH_Pin, GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -216,7 +153,56 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		__nop();
+		printf("SYNC-PDWN\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin);
+			HAL_Delay(10);
+		}
+		HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("iMOSI\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI1_MOSI_GPIO_Port, SPI1_MOSI_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("iSCK\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI1_SCK_GPIO_Port, SPI1_SCK_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("iCS\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("vMOSI\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI3_MOSI_GPIO_Port, SPI3_MOSI_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("vSCK\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI3_SCK_GPIO_Port, SPI3_SCK_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
+		printf("vCS\n");
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_RESET ){
+			HAL_GPIO_TogglePin(SPI3_CS_GPIO_Port, SPI3_CS_Pin);
+			HAL_Delay(10);
+		}
+		while( HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET );
+		
   }
   /* USER CODE END 3 */
 }
@@ -277,86 +263,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief SPI3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI3_Init(void)
-{
-
-  /* USER CODE BEGIN SPI3_Init 0 */
-
-  /* USER CODE END SPI3_Init 0 */
-
-  /* USER CODE BEGIN SPI3_Init 1 */
-
-  /* USER CODE END SPI3_Init 1 */
-  /* SPI3 parameter configuration*/
-  hspi3.Instance = SPI3;
-  hspi3.Init.Mode = SPI_MODE_MASTER;
-  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi3.Init.CLKPhase = SPI_PHASE_2EDGE;
-  hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
-  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi3.Init.CRCPolynomial = 7;
-  hspi3.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi3.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
-  if (HAL_SPI_Init(&hspi3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI3_Init 2 */
-
-  /* USER CODE END SPI3_Init 2 */
-
 }
 
 /**
@@ -531,24 +437,11 @@ static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
-  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-  /* DMA1_Stream7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
   /* DMA2_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
-  /* DMA2_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
-  /* DMA2_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
 
 }
 
@@ -578,11 +471,17 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOF, SPI3_CS_Pin|R25A_ON_Pin|R25A_OFF_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, SPI1_SCK_Pin|SPI1_MOSI_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|SPI1_SYNC_Pin|SPI1_CS_Pin|LD3_Pin 
                           |LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, SPI3_SCK_Pin|SPI3_MOSI_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : R5mA_ON_Pin R5mA_OFF_Pin SPI4_LATCH_Pin SPI4_CS_Pin */
   GPIO_InitStruct.Pin = R5mA_ON_Pin|R5mA_OFF_Pin|SPI4_LATCH_Pin|SPI4_CS_Pin;
@@ -610,6 +509,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SPI3_DRDY_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : SPI1_SCK_Pin SPI1_MOSI_Pin */
+  GPIO_InitStruct.Pin = SPI1_SCK_Pin|SPI1_MOSI_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SPI1_MISO_Pin */
+  GPIO_InitStruct.Pin = SPI1_MISO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(SPI1_MISO_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pins : LD1_Pin SPI1_SYNC_Pin SPI1_CS_Pin LD3_Pin 
                            LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|SPI1_SYNC_Pin|SPI1_CS_Pin|LD3_Pin 
@@ -632,17 +544,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : dummy_SPI1_DRDY_Pin */
-  GPIO_InitStruct.Pin = dummy_SPI1_DRDY_Pin;
+  /*Configure GPIO pins : dummy_SPI1_DRDY_Pin SPI3_MISO_Pin */
+  GPIO_InitStruct.Pin = dummy_SPI1_DRDY_Pin|SPI3_MISO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(dummy_SPI1_DRDY_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SPI1_DRDY_Pin */
   GPIO_InitStruct.Pin = SPI1_DRDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SPI1_DRDY_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SPI3_SCK_Pin SPI3_MOSI_Pin */
+  GPIO_InitStruct.Pin = SPI3_SCK_Pin|SPI3_MOSI_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
