@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
+#include "circular_buffer.h"
 /* USER CODE END Includes */
   
 /* Private typedef -----------------------------------------------------------*/
@@ -73,6 +74,14 @@ extern MAX5717_t dac1;
 extern volatile uint8_t dmaDacTx[];
 extern volatile uint16_t dmaPtr;
 extern const uint16_t dmaBufferSize;
+extern volatile uint8_t usartRxBuf[32];
+extern volatile uint8_t usartRxPrt;
+
+volatile extern uint8_t ringBuffer[];
+volatile extern cbuf_handle_t rxBuf;
+volatile extern uint8_t flagNewline;
+
+uint8_t rx;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -283,10 +292,23 @@ void SPI1_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
+	if(__HAL_UART_GET_IT_SOURCE(&huart3, UART_IT_RXNE) == SET){
+		/*
+		HAL_UART_Receive_IT(&huart3, (uint8_t*)&usartRxBuf[usartRxPrt], 1);
+		usartRxPrt++;
+		if(usartRxPrt > 31) usartRxPrt = 0;
+		*/
+		HAL_UART_Receive_IT(&huart3, &rx, 1);
+		if(rx == '\r')
+			flagNewline = 1;
+		circular_buf_put(rxBuf, rx);
+		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+	}
 
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);
   /* USER CODE BEGIN USART3_IRQn 1 */
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // must be enabled again
 
   /* USER CODE END USART3_IRQn 1 */
 }

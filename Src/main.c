@@ -28,6 +28,9 @@
 #include "max5717.h"
 #include "ads1255.h"
 #include "2.476.101.01.BSP.h"
+
+#include "circular_buffer.h"
+#include "scpi/scpi.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -38,6 +41,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define DMA_BUFFER_SIZE 64
+#define UART_BUFFER_LENGTH 64
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -69,6 +74,13 @@ ADS125X_t adci;
 volatile uint8_t dmaDacTx [ 3*DMA_BUFFER_SIZE ];
 const uint16_t dmaBufferSize = DMA_BUFFER_SIZE;
 volatile uint16_t dmaPtr;
+
+volatile uint8_t usartRxBuf[32];
+volatile uint8_t usartRxPrt;
+
+volatile uint8_t ringBuffer[UART_BUFFER_LENGTH];
+volatile cbuf_handle_t rxBuf;
+volatile uint8_t flagNewline;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -107,6 +119,38 @@ int ferror(FILE *f){
   return 0;
 }
 /* PRINTF REDIRECT to UART END */
+
+/*
+#define SMALL_BUFFER_LEN 10
+char smbuffer[SMALL_BUFFER_LEN];
+
+#define SCPI_ERROR_QUEUE_SIZE 17 
+int16_t scpi_error_queue_data[SCPI_ERROR_QUEUE_SIZE];
+
+size_t myWrite(scpi_t * context, const char * data, size_t len) {
+    (void) context;
+    return fwrite(data, 1, len, stdout);
+}
+
+scpi_result_t DMM_MeasureVoltageDcQ(scpi_t * context){
+	printf("voltmeter\n");
+	return SCPI_RES_OK;
+}
+
+scpi_command_t scpi_commands[] = {
+	{ .pattern = "*IDN?", .callback = SCPI_CoreIdnQ,},
+	{ .pattern = "*RST", .callback = SCPI_CoreRst,},
+  { .pattern = "MEASure:VOLTage:DC?", .callback = DMM_MeasureVoltageDcQ,},
+	SCPI_CMD_LIST_END
+};
+
+scpi_interface_t scpi_interface = {
+	.write = myWrite,
+	.error = NULL,
+	.reset = NULL,
+};
+*/
+
 /* USER CODE END 0 */
 
 /**
@@ -200,7 +244,7 @@ int main(void)
 		dmaDacTx[3*i+1] = (uint8_t)((code >>  8) & 0xFF);
 		dmaDacTx[3*i+2] = (uint8_t)((code >>  0) & 0xFF);
 		// printf("%.5f,\n", volts);
-		printf("%d\n", code);
+		//printf("%d\n", code);
 	}
 	
 	HAL_TIM_Base_Start_IT(&htim4);
@@ -208,6 +252,13 @@ int main(void)
 
 	
 	HAL_GPIO_WritePin(SPI4_LATCH_GPIO_Port, SPI4_LATCH_Pin, GPIO_PIN_SET);
+	
+	
+	rxBuf = circular_buf_init( (unsigned char*)ringBuffer, UART_BUFFER_LENGTH);
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
+  usartRxPrt = 0;
+	flagNewline = 0;
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -218,6 +269,21 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		__nop();
+		
+		HAL_Delay(100);
+		while(flagNewline == 0);
+		
+		flagNewline = 0;
+		HAL_Delay(10);
+		while(!circular_buf_empty(rxBuf))
+		{
+			uint8_t data;
+			circular_buf_get(rxBuf, &data);
+			if(data >= 32 && data <= 126)  // ascii range
+				printf("%u ", data);
+			// weiterreichen an SCPI parser
+		}
+		printf("\n");
   }
   /* USER CODE END 3 */
 }

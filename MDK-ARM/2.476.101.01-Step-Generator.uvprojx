@@ -338,7 +338,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F746xx,USE_HAL_DRIVER,STM32F746xx,ARM_MATH_CM7</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;../Drivers/STM32F7xx_HAL_Driver/Inc;../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F7xx/Include;../Drivers/CMSIS/Include;../Drivers/CMSIS/DSP;../Drivers/CMSIS/DSP/Include;../Drivers/libscpi/inc</IncludePath>
+              <IncludePath>../Inc;../Drivers/STM32F7xx_HAL_Driver/Inc;../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F7xx/Include;../Drivers/CMSIS/Include;../Drivers/CMSIS/DSP;../Drivers/CMSIS/DSP/Include;../Drivers/libscpi/inc;../Drivers/circular_buffer</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -606,6 +606,16 @@
               <FileName>utils_private.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Drivers\libscpi\src\utils_private.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Drivers/circular_buffer</GroupName>
+          <Files>
+            <File>
+              <FileName>circular_buffer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\circular_buffer\circular_buffer.c</FilePath>
             </File>
           </Files>
         </Group>

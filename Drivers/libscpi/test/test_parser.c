@@ -1,6 +1,29 @@
-/*
- * File:   test_parser.c
- * Author: Jan Breuer
+/*-
+ * BSD 2-Clause License
+ *
+ * Copyright (c) 2012-2018, Jan Breuer
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <stdio.h>
@@ -78,8 +101,14 @@ static const scpi_command_t scpi_commands[] = {
     { .pattern = "SYSTem:VERSion?", .callback = SCPI_SystemVersionQ,},
 
     { .pattern = "STATus:QUEStionable[:EVENt]?", .callback = SCPI_StatusQuestionableEventQ,},
+    { .pattern = "STATus:QUEStionable:CONDition?", .callback = SCPI_StatusQuestionableConditionQ,},
     { .pattern = "STATus:QUEStionable:ENABle", .callback = SCPI_StatusQuestionableEnable,},
     { .pattern = "STATus:QUEStionable:ENABle?", .callback = SCPI_StatusQuestionableEnableQ,},
+
+    {.pattern = "STATus:OPERation[:EVENt]?", .callback = SCPI_StatusOperationEventQ, },
+    {.pattern = "STATus:OPERation:CONDition?", .callback = SCPI_StatusOperationConditionQ, },
+    {.pattern = "STATus:OPERation:ENABle", .callback = SCPI_StatusOperationEnable, },
+    {.pattern = "STATus:OPERation:ENABle?", .callback = SCPI_StatusOperationEnableQ, },
 
     { .pattern = "STATus:PRESet", .callback = SCPI_StatusPreset,},
 
@@ -236,6 +265,14 @@ static void testCommandsHandling(void) {
     TEST_INPUT("\r\n", "MA,IN,0,VER\r\n");
     output_buffer_clear();
 
+    /* Test empty command at the beggining */
+    TEST_INPUT(";*IDN?\r\n", "MA,IN,0,VER\r\n");
+    output_buffer_clear();
+
+    TEST_INPUT(";", "");
+    TEST_INPUT("*IDN?\r\n", "MA,IN,0,VER\r\n");
+    output_buffer_clear();
+
     /* Test input "timeout" - input with length == 0 */
     TEST_INPUT("*IDN?", "");
     TEST_INPUT("", "MA,IN,0,VER\r\n");
@@ -282,11 +319,12 @@ static void testErrorHandling(void) {
 
 
 
-    // TODO: SCPI_ERROR_INVALID_SEPARATOR
-    // TODO: SCPI_ERROR_INVALID_SUFFIX
-    // TODO: SCPI_ERROR_SUFFIX_NOT_ALLOWED
-    // TODO: SCPI_ERROR_EXECUTION_ERROR
-    // TODO: SCPI_ERROR_ILLEGAL_PARAMETER_VALUE
+    /* TODO: SCPI_ERROR_INVALID_SEPARATOR
+     * TODO: SCPI_ERROR_INVALID_SUFFIX
+     * TODO: SCPI_ERROR_SUFFIX_NOT_ALLOWED
+     * TODO: SCPI_ERROR_EXECUTION_ERROR
+     * TODO: SCPI_ERROR_ILLEGAL_PARAMETER_VALUE
+     */
 
     output_buffer_clear();
     error_buffer_clear();
@@ -349,7 +387,7 @@ static void testIEEE4882(void) {
 }
 
 #define TEST_IEEE4882_REG(reg, expected) {                                     \
-    CU_ASSERT_EQUAL(SCPI_RegGet(&scpi_context, reg), expected);                \
+    CU_ASSERT_EQUAL(SCPI_RegGet(&scpi_context, (scpi_reg_name_t)(reg)), expected);\
 }
 
 
@@ -433,11 +471,37 @@ static void testIEEE4882(void) {
     TEST_IEEE4882("STATus:QUEStionable:ENABle 2\r\n", "");
     TEST_IEEE4882_REG(SCPI_REG_QUESE, 2);
 
+    TEST_IEEE4882("STATus:QUEStionable:CONDition?\r\n", "0\r\n");
+    TEST_IEEE4882_REG_SET(SCPI_REG_QUESC, 1);
+    TEST_IEEE4882("STATus:QUEStionable:CONDition?\r\n", "1\r\n");
+    TEST_IEEE4882_REG(SCPI_REG_QUESC, 1);
+    TEST_IEEE4882("STATus:QUEStionable:EVENt?\r\n", "1\r\n");
+    TEST_IEEE4882_REG_SET(SCPI_REG_QUESC, 0);
+    TEST_IEEE4882("STATus:QUEStionable:CONDition?\r\n", "0\r\n");
     TEST_IEEE4882("STATus:QUEStionable:EVENt?\r\n", "0\r\n");
     TEST_IEEE4882_REG_SET(SCPI_REG_QUES, 1);
     TEST_IEEE4882("STATus:QUEStionable:EVENt?\r\n", "1\r\n");
     TEST_IEEE4882_REG(SCPI_REG_QUES, 0);
     TEST_IEEE4882("STATus:QUEStionable:EVENt?\r\n", "0\r\n");
+
+    TEST_IEEE4882_REG_SET(SCPI_REG_OPERE, 1);
+    TEST_IEEE4882("STATus:OPERation:ENABle?\r\n", "1\r\n");
+    TEST_IEEE4882_REG(SCPI_REG_OPERE, 1);
+    TEST_IEEE4882("STATus:OPERation:ENABle 2\r\n", "");
+    TEST_IEEE4882_REG(SCPI_REG_OPERE, 2);
+
+    TEST_IEEE4882("STATus:OPERation:CONDition?\r\n", "0\r\n");
+    TEST_IEEE4882_REG_SET(SCPI_REG_OPERC, 1);
+    TEST_IEEE4882("STATus:OPERation:CONDition?\r\n", "1\r\n");
+    TEST_IEEE4882_REG(SCPI_REG_OPERC, 1);
+    TEST_IEEE4882("STATus:OPERation:EVENt?\r\n", "1\r\n");
+    TEST_IEEE4882_REG_SET(SCPI_REG_OPERC, 0);
+    TEST_IEEE4882("STATus:OPERation:CONDition?\r\n", "0\r\n");
+    TEST_IEEE4882_REG(SCPI_REG_OPERC, 0);
+    TEST_IEEE4882_REG_SET(SCPI_REG_OPER, 1);
+    TEST_IEEE4882("STATus:OPERation:EVENt?\r\n", "1\r\n");
+    TEST_IEEE4882_REG(SCPI_REG_OPER, 0);
+    TEST_IEEE4882("STATus:OPERation:EVENt?\r\n", "0\r\n");
 
     TEST_IEEE4882("STUB\r\n", "");
     TEST_IEEE4882("STUB?\r\n", "0\r\n");
@@ -471,17 +535,17 @@ static void testIEEE4882(void) {
 static void testSCPI_ParamInt32(void) {
     TEST_ParamInt32("10", TRUE, 10, TRUE, 0);
     TEST_ParamInt32("", FALSE, 0, FALSE, 0);
-    TEST_ParamInt32("10.5", TRUE, 10, TRUE, 0); // TODO: should be FALSE, -104
+    TEST_ParamInt32("10.5", TRUE, 10, TRUE, 0); /* TODO: should be FALSE, -104 */
     TEST_ParamInt32("#B101010", TRUE, 42, TRUE, 0);
     TEST_ParamInt32("#H101010", TRUE, 1052688, TRUE, 0);
     TEST_ParamInt32("#Q10", TRUE, 8, TRUE, 0);
 
-    TEST_ParamInt32("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamInt32("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamInt32("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamInt32("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamInt32("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamInt32("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 
-    // test range
+    /* test range */
     TEST_ParamInt32("2147483647", TRUE, 2147483647, TRUE, 0);
     TEST_ParamInt32("-2147483647", TRUE, -2147483647, TRUE, 0);
 }
@@ -510,17 +574,17 @@ static void testSCPI_ParamInt32(void) {
 static void testSCPI_ParamUInt32(void) {
     TEST_ParamUInt32("10", TRUE, 10, TRUE, 0);
     TEST_ParamUInt32("", FALSE, 0, FALSE, 0);
-    TEST_ParamUInt32("10.5", TRUE, 10, TRUE, 0); // TODO: should be FALSE, -104
+    TEST_ParamUInt32("10.5", TRUE, 10, TRUE, 0); /* TODO: should be FALSE, -104 */
     TEST_ParamUInt32("#B101010", TRUE, 42, TRUE, 0);
     TEST_ParamUInt32("#H101010", TRUE, 1052688, TRUE, 0);
     TEST_ParamUInt32("#Q10", TRUE, 8, TRUE, 0);
 
-    TEST_ParamUInt32("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamUInt32("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamUInt32("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamUInt32("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamUInt32("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamUInt32("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 
-    // test range
+    /* test range */
     TEST_ParamUInt32("2147483647", TRUE, 2147483647ULL, TRUE, 0);
     TEST_ParamUInt32("4294967295", TRUE, 4294967295ULL, TRUE, 0);
 }
@@ -549,17 +613,17 @@ static void testSCPI_ParamUInt32(void) {
 static void testSCPI_ParamInt64(void) {
     TEST_ParamInt64("10", TRUE, 10, TRUE, 0);
     TEST_ParamInt64("", FALSE, 0, FALSE, 0);
-    TEST_ParamInt64("10.5", TRUE, 10, TRUE, 0); // TODO: should be FALSE, -104
+    TEST_ParamInt64("10.5", TRUE, 10, TRUE, 0); /* TODO: should be FALSE, -104 */
     TEST_ParamInt64("#B101010", TRUE, 42, TRUE, 0);
     TEST_ParamInt64("#H101010", TRUE, 1052688, TRUE, 0);
     TEST_ParamInt64("#Q10", TRUE, 8, TRUE, 0);
 
-    TEST_ParamInt64("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamInt64("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamInt64("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamInt64("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamInt64("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamInt64("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 
-    // test range
+    /* test range */
     TEST_ParamInt64("2147483647", TRUE, 2147483647LL, TRUE, 0);
     TEST_ParamInt64("-2147483647", TRUE, -2147483647LL, TRUE, 0);
     TEST_ParamInt64("9223372036854775807", TRUE, 9223372036854775807LL, TRUE, 0);
@@ -590,17 +654,17 @@ static void testSCPI_ParamInt64(void) {
 static void testSCPI_ParamUInt64(void) {
     TEST_ParamUInt64("10", TRUE, 10, TRUE, 0);
     TEST_ParamUInt64("", FALSE, 0, FALSE, 0);
-    TEST_ParamUInt64("10.5", TRUE, 10, TRUE, 0); // TODO: should be FALSE, -104
+    TEST_ParamUInt64("10.5", TRUE, 10, TRUE, 0); /* TODO: should be FALSE, -104 */
     TEST_ParamUInt64("#B101010", TRUE, 42, TRUE, 0);
     TEST_ParamUInt64("#H101010", TRUE, 1052688, TRUE, 0);
     TEST_ParamUInt64("#Q10", TRUE, 8, TRUE, 0);
 
-    TEST_ParamUInt64("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamUInt64("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamUInt64("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamUInt64("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamUInt64("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamUInt64("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 
-    // test range
+    /* test range */
     TEST_ParamUInt64("2147483647", TRUE, 2147483647ULL, TRUE, 0);
     TEST_ParamUInt64("4294967295", TRUE, 4294967295ULL, TRUE, 0);
     TEST_ParamUInt64("9223372036854775807", TRUE, 9223372036854775807ULL, TRUE, 0);
@@ -638,8 +702,8 @@ static void testSCPI_ParamFloat(void) {
     TEST_ParamFloat("#Q10", TRUE, 8, TRUE, 0);
     TEST_ParamFloat("#HFFFFFF", TRUE, 0xFFFFFFu, TRUE, 0);
 
-    TEST_ParamFloat("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamFloat("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamFloat("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamFloat("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamFloat("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamFloat("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 }
@@ -674,8 +738,8 @@ static void testSCPI_ParamDouble(void) {
     TEST_ParamDouble("#Q10", TRUE, 8, TRUE, 0);
     TEST_ParamDouble("#HFFFFFFFF", TRUE, 0xFFFFFFFFu, TRUE, 0);
 
-    TEST_ParamDouble("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); // missing parameter
-    TEST_ParamDouble("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); // Data type error
+    TEST_ParamDouble("", TRUE, 0, FALSE, SCPI_ERROR_MISSING_PARAMETER); /* missing parameter */
+    TEST_ParamDouble("abcd", TRUE, 0, FALSE, SCPI_ERROR_DATA_TYPE_ERROR); /* Data type error */
     TEST_ParamDouble("10.5V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
     TEST_ParamDouble("10V", TRUE, 0, FALSE, SCPI_ERROR_SUFFIX_NOT_ALLOWED);
 }
@@ -704,11 +768,11 @@ static void testSCPI_ParamDouble(void) {
 
 static void testSCPI_ParamCharacters(void) {
     TEST_ParamCharacters("10", TRUE, "10", TRUE, 0);
-    TEST_ParamCharacters(" ABCD", TRUE, "ABCD", TRUE, 0); // TokProgramMnemonic
-    TEST_ParamCharacters("\"ABCD\"", TRUE, "ABCD", TRUE, 0); // TokDoubleQuoteProgramData
-    TEST_ParamCharacters("\'ABCD\'", TRUE, "ABCD", TRUE, 0); // TokSingleQuoteProgramData
-    TEST_ParamCharacters("#204ABCD", TRUE, "ABCD", TRUE, 0); // TokArbitraryBlockProgramData
-    TEST_ParamCharacters("#210ABCD", TRUE, "", FALSE, SCPI_ERROR_INVALID_STRING_DATA); // invalid Block Data
+    TEST_ParamCharacters(" ABCD", TRUE, "ABCD", TRUE, 0); /* TokProgramMnemonic */
+    TEST_ParamCharacters("\"ABCD\"", TRUE, "ABCD", TRUE, 0); /* TokDoubleQuoteProgramData */
+    TEST_ParamCharacters("\'ABCD\'", TRUE, "ABCD", TRUE, 0); /* TokSingleQuoteProgramData */
+    TEST_ParamCharacters("#204ABCD", TRUE, "ABCD", TRUE, 0); /* TokArbitraryBlockProgramData */
+    TEST_ParamCharacters("#210ABCD", TRUE, "", FALSE, SCPI_ERROR_INVALID_STRING_DATA); /* invalid Block Data */
 }
 
 
@@ -1012,8 +1076,8 @@ static void testChannelList(void) {
     CU_ASSERT_EQUAL(result, expected_result);                                           \
     if (expected_result) {                                                              \
         CU_ASSERT_EQUAL(value.special, expected_special);                               \
-        if (value.special) CU_ASSERT_EQUAL(value.tag, expected_tag);                    \
-        if (!value.special) CU_ASSERT_DOUBLE_EQUAL(value.value, expected_value, 0.000001);\
+        if (value.special) CU_ASSERT_EQUAL(value.content.tag, expected_tag);                    \
+        if (!value.special) CU_ASSERT_DOUBLE_EQUAL(value.content.value, expected_value, 0.000001);\
         CU_ASSERT_EQUAL(value.unit, expected_unit);                                     \
         CU_ASSERT_EQUAL(value.base, expected_base);                                     \
     }                                                                                   \
@@ -1123,7 +1187,7 @@ static void testResultInt32(void) {
     TEST_Result(Int32, 10, "10");
     TEST_Result(Int32, -10, "-10");
     TEST_Result(Int32, 2147483647L, "2147483647");
-    //TEST_Result(Int32, -2147483648L, "-2147483648"); // bug in GCC
+    /* TEST_Result(Int32, -2147483648L, "-2147483648"); bug in GCC */
     TEST_Result(Int32, -2147483647L, "-2147483647");
 }
 
@@ -1131,7 +1195,7 @@ static void testResultUInt32(void) {
     TEST_Result(UInt32, 10, "10");
     TEST_Result(UInt32, -10, "4294967286");
     TEST_Result(UInt32, 2147483647L, "2147483647");
-    //TEST_Result(UInt32, -2147483648L, "2147483648"); // bug in GCC
+    /* TEST_Result(UInt32, -2147483648L, "2147483648"); bug in GCC */
     TEST_Result(UInt32, -2147483647L, "2147483649");
     TEST_Result(UInt32, 4294967295UL, "4294967295");
 
@@ -1148,10 +1212,10 @@ static void testResultInt64(void) {
     TEST_Result(Int64, 32767, "32767");
     TEST_Result(Int64, -32768, "-32768");
     TEST_Result(Int64, 2147483647L, "2147483647");
-    //TEST_Result(Int64, -2147483648, "-2147483648"); // bug in gcc
+    /* TEST_Result(Int64, -2147483648, "-2147483648"); bug in gcc */
     TEST_Result(Int64, -2147483647L, "-2147483647");
     TEST_Result(Int64, 9223372036854775807LL, "9223372036854775807");
-    //TEST_Result(Int64, -9223372036854775808LL, "-9223372036854775808"); bug in GCC
+    /* TEST_Result(Int64, -9223372036854775808LL, "-9223372036854775808"); bug in GCC */
     TEST_Result(Int64, -9223372036854775807LL, "-9223372036854775807");
 }
 
@@ -1163,10 +1227,10 @@ static void testResultUInt64(void) {
     TEST_Result(UInt64, 32767, "32767");
     TEST_Result(UInt64, -32768, "18446744073709518848");
     TEST_Result(UInt64, 2147483647L, "2147483647");
-    //TEST_Result(UInt64, -2147483648L, "18446744071562067968"); // bug in GCC
+    /* TEST_Result(UInt64, -2147483648L, "18446744071562067968"); bug in GCC */
     TEST_Result(UInt64, -2147483647L, "18446744071562067969");
     TEST_Result(UInt64, 9223372036854775807LL, "9223372036854775807");
-    //TEST_Result(Int64, -9223372036854775808LL, "9223372036854775808"); bug in GCC
+    /* TEST_Result(Int64, -9223372036854775808LL, "9223372036854775808"); bug in GCC */
     TEST_Result(UInt64, -9223372036854775807LL, "9223372036854775809");
     TEST_Result(UInt64, 18446744073709551615ULL, "18446744073709551615");
 
@@ -1183,7 +1247,7 @@ static void testResultFloat(void) {
     TEST_Result(Float, 32767, "32767");
     TEST_Result(Float, -32768, "-32768");
     TEST_Result(Float, 2147483647L, "2.14748e+09");
-    //TEST_Result(Float, -2147483648, "-2.14748e+09"); // bug in GCC
+    /* TEST_Result(Float, -2147483648, "-2.14748e+09"); bug in GCC */
     TEST_Result(Float, -2147483647L, "-2.14748e+09");
     TEST_Result(Float, 9223372036854775807LL, "9.22337e+18");
     TEST_Result(Float, -9223372036854775807LL, "-9.22337e+18");
@@ -1200,10 +1264,12 @@ static void testResultDouble(void) {
     TEST_Result(Double, 32767, "32767");
     TEST_Result(Double, -32768, "-32768");
     TEST_Result(Double, 2147483647, "2147483647");
-    //TEST_Result(Double, -2147483648, "-2147483648"); // bug in GCC
+    /* TEST_Result(Double, -2147483648, "-2147483648"); bug in GCC */
     TEST_Result(Double, -2147483647, "-2147483647");
-    TEST_Result(Double, 9223372036854775807LL, "9.22337203685478e+18");
-    TEST_Result(Double, -9223372036854775807LL, "-9.22337203685478e+18");
+    /* TEST_Result(Double, 9223372036854775807LL, "9.22337203685478e+18"); */
+    /* TEST_Result(Double, -9223372036854775807LL, "-9.22337203685478e+18"); */
+    TEST_Result(Double, 9223372036854700000LL, "9.2233720368547e+18");
+    TEST_Result(Double, -9223372036854700000LL, "-9.2233720368547e+18");
 
     TEST_Result(Double, 1.256e-17, "1.256e-17");
     TEST_Result(Double, -1.256e-17, "-1.256e-17");
@@ -1416,7 +1482,7 @@ static void testNumberToStr(void) {
     number.base = 10;\
     number.special = (_special);\
     number.unit = (_unit);\
-    if (number.special) { number.tag = (int)(_value); } else { number.value = (_value); }\
+    if (number.special) { number.content.tag = (int)(_value); } else { number.content.value = (_value); }\
     char buffer[100 + 1];\
     size_t res_len;\
     res_len = SCPI_NumberToStr(&scpi_context, scpi_special_numbers_def, &number, buffer, 100);\
@@ -1424,9 +1490,62 @@ static void testNumberToStr(void) {
     CU_ASSERT_EQUAL(res_len, strlen(expected_result));\
 } while(0)
 
+#define TEST_SCPI_NumberToStr_limited(_special, _value, _unit, expected_result, limit) do {\
+    scpi_number_t number;\
+    number.base = 10;\
+    number.special = (_special);\
+    number.unit = (_unit);\
+    if (number.special) { number.content.tag = (int)(_value); } else { number.content.value = (_value); }\
+    char buffer[100];\
+    memset(buffer, 0xaa, 100);\
+    size_t res_len;\
+    res_len = SCPI_NumberToStr(&scpi_context, scpi_special_numbers_def, &number, buffer, limit);\
+    size_t expected_len = SCPIDEFINE_strnlen(expected_result, limit - 1);\
+    CU_ASSERT_NSTRING_EQUAL(buffer, expected_result, expected_len);\
+    CU_ASSERT_EQUAL(buffer[expected_len], 0);\
+    CU_ASSERT_EQUAL((unsigned char)buffer[limit], 0xaa);\
+    CU_ASSERT_EQUAL(res_len, expected_len);\
+} while(0)
+
     TEST_SCPI_NumberToStr(FALSE, 10.5, SCPI_UNIT_NONE, "10.5");
     TEST_SCPI_NumberToStr(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V");
     TEST_SCPI_NumberToStr(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault");
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 1);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 1);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 1);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 2);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 2);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 2);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 3);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 3);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 3);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 4);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 4);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 4);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 5);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 5);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 5);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 6);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 6);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 6);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 7);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 7);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 7);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 8);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 8);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 8);
+
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_NONE, "10.5", 9);
+    TEST_SCPI_NumberToStr_limited(FALSE, 10.5, SCPI_UNIT_VOLT, "10.5 V", 9);
+    TEST_SCPI_NumberToStr_limited(TRUE, SCPI_NUM_DEF, SCPI_UNIT_NONE, "DEFault", 9);
 }
 
 static void testErrorQueue(void) {
