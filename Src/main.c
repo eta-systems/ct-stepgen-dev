@@ -153,6 +153,7 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim4);
 	HAL_TIM_Base_Start_IT(&htim5);
 	HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+  HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
 	
 	dac1.csPort    = SPI4_CS_GPIO_Port;
 	dac1.csPin     = SPI4_CS_Pin;
@@ -179,7 +180,7 @@ int main(void)
 	adcv.vref = 2.5f;
 	adcv.hspix = &hspi3;
 	printf("config ADS1255...");
-	ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	//ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
 	printf("done\n");
 	
 	float volts = 0.0f;
@@ -203,7 +204,7 @@ int main(void)
 	}
 	
 	HAL_TIM_Base_Start_IT(&htim4);
-  // HAL_SPI_Transmit_DMA(&hspi4, dmaDacTx, 3*DMA_BUFFER_SIZE);
+  HAL_SPI_Transmit_DMA(&hspi4, (uint8_t *)dmaDacTx, 3*DMA_BUFFER_SIZE);
 
 	
 	HAL_GPIO_WritePin(SPI4_LATCH_GPIO_Port, SPI4_LATCH_Pin, GPIO_PIN_SET);

@@ -325,7 +325,7 @@
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
             <uC99>1</uC99>
-            <uGnu>0</uGnu>
+            <uGnu>1</uGnu>
             <useXO>0</useXO>
             <v6Lang>1</v6Lang>
             <v6LangP>1</v6LangP>
@@ -338,7 +338,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F746xx,USE_HAL_DRIVER,STM32F746xx,ARM_MATH_CM7</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;        ../Drivers/STM32F7xx_HAL_Driver/Inc;        ../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;        ../Drivers/CMSIS/Device/ST/STM32F7xx/Include;        ../Drivers/CMSIS/Include;        ../Drivers/CMSIS/DSP;        ../Drivers/CMSIS/DSP/Include</IncludePath>
+              <IncludePath>../Inc;../Drivers/STM32F7xx_HAL_Driver/Inc;../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F7xx/Include;../Drivers/CMSIS/Include;../Drivers/CMSIS/DSP;../Drivers/CMSIS/DSP/Include;../Drivers/libscpi/inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -536,6 +536,76 @@
               <FileName>system_stm32f7xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/system_stm32f7xx.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Drivers/libscpi</GroupName>
+          <Files>
+            <File>
+              <FileName>error.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\error.c</FilePath>
+            </File>
+            <File>
+              <FileName>expression.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\expression.c</FilePath>
+            </File>
+            <File>
+              <FileName>fifo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\fifo.c</FilePath>
+            </File>
+            <File>
+              <FileName>fifo_private.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\libscpi\src\fifo_private.h</FilePath>
+            </File>
+            <File>
+              <FileName>ieee488.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\ieee488.c</FilePath>
+            </File>
+            <File>
+              <FileName>lexer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\lexer.c</FilePath>
+            </File>
+            <File>
+              <FileName>lexer_private.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\libscpi\src\lexer_private.h</FilePath>
+            </File>
+            <File>
+              <FileName>minimal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\minimal.c</FilePath>
+            </File>
+            <File>
+              <FileName>parser.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\parser.c</FilePath>
+            </File>
+            <File>
+              <FileName>parser_private.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\libscpi\src\parser_private.h</FilePath>
+            </File>
+            <File>
+              <FileName>units.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\units.c</FilePath>
+            </File>
+            <File>
+              <FileName>utils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\libscpi\src\utils.c</FilePath>
+            </File>
+            <File>
+              <FileName>utils_private.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\libscpi\src\utils_private.h</FilePath>
             </File>
           </Files>
         </Group>

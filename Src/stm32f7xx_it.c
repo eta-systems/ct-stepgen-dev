@@ -250,7 +250,7 @@ void TIM4_IRQHandler(void)
 	
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);
 	for(uint16_t i=0; i<128; i++);
-	HAL_SPI_Transmit_DMA(dac1.hspix, &dmaDacTx[3*dmaPtr], 3);
+	HAL_SPI_Transmit_DMA(dac1.hspix, (uint8_t*)&dmaDacTx[3*dmaPtr], 3);
 	
 	dmaPtr++;
 	if(dmaPtr >= dmaBufferSize)

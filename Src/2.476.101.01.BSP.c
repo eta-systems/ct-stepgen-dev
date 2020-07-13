@@ -51,4 +51,5 @@ float ETA_CTGS_GetCurrent(float Vhi, float Vlo, CurrentRange_t range)
 
 	iMeas = (Vforce - Vdut) / (Rs);
 	*/
+	return 0;
 }

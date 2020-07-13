@@ -64,7 +64,7 @@ uint8_t MAX5717_Init(MAX5717_t *hdac, SPI_HandleTypeDef *hspi, float vref)
 	// Datasheet 1. 16-Bit Serial Interface Timing Diagram
 	HAL_GPIO_WritePin(hdac->csPort, hdac->csPin, GPIO_PIN_SET);        // !CS --> inverting
 	HAL_GPIO_WritePin(hdac->latchPort, hdac->latchPin, GPIO_PIN_SET);  // !LATCH --> inverting
-	
+	return 0;
 }
 
 
