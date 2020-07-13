@@ -81,6 +81,8 @@ volatile uint8_t usartRxPrt;
 volatile uint8_t ringBuffer[UART_BUFFER_LENGTH];
 volatile cbuf_handle_t rxBuf;
 volatile uint8_t flagNewline;
+
+scpi_t scpi_context;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,12 +122,16 @@ int ferror(FILE *f){
 }
 /* PRINTF REDIRECT to UART END */
 
-/*
-#define SMALL_BUFFER_LEN 10
-char smbuffer[SMALL_BUFFER_LEN];
-
+#define SCPI_INPUT_BUFFER_LENGTH 32
 #define SCPI_ERROR_QUEUE_SIZE 17 
+
+int8_t scpi_input_buffer[SCPI_INPUT_BUFFER_LENGTH];
 int16_t scpi_error_queue_data[SCPI_ERROR_QUEUE_SIZE];
+
+const char SCPI_IDN1 = 0x42;
+const char SCPI_IDN2 = 0x43;
+const char SCPI_IDN3 = 0x44;
+const char SCPI_IDN4 = 0x45;
 
 size_t myWrite(scpi_t * context, const char * data, size_t len) {
     (void) context;
@@ -149,7 +155,6 @@ scpi_interface_t scpi_interface = {
 	.error = NULL,
 	.reset = NULL,
 };
-*/
 
 /* USER CODE END 0 */
 
@@ -247,6 +252,14 @@ int main(void)
 		//printf("%d\n", code);
 	}
 	
+	SCPI_Init(&scpi_context,
+    scpi_commands,
+    &scpi_interface,
+    scpi_units_def,
+    &SCPI_IDN1, &SCPI_IDN2, &SCPI_IDN3, &SCPI_IDN4,
+    (char*)&scpi_input_buffer, SCPI_INPUT_BUFFER_LENGTH,
+    (char*)&scpi_error_queue_data, SCPI_ERROR_QUEUE_SIZE);
+	
 	HAL_TIM_Base_Start_IT(&htim4);
   HAL_SPI_Transmit_DMA(&hspi4, (uint8_t *)dmaDacTx, 3*DMA_BUFFER_SIZE);
 
@@ -275,15 +288,22 @@ int main(void)
 		
 		flagNewline = 0;
 		HAL_Delay(10);
+		
+		uint8_t parseCmd[UART_BUFFER_LENGTH];
+		uint16_t len = 0;
+		
 		while(!circular_buf_empty(rxBuf))
 		{
 			uint8_t data;
 			circular_buf_get(rxBuf, &data);
 			if(data >= 32 && data <= 126)  // ascii range
 				printf("%u ", data);
+			  parseCmd[len++] = data;
 			// weiterreichen an SCPI parser
 		}
 		printf("\n");
+		SCPI_Parse(&scpi_context, (char *)&parseCmd, len);
+		
   }
   /* USER CODE END 3 */
 }
