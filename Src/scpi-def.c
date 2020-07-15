@@ -41,79 +41,52 @@
 #include "scpi/scpi.h"
 #include "scpi-def.h"
 
-static scpi_result_t DMM_MeasureVoltageDcQ(scpi_t * context) {
-    scpi_number_t param1, param2;
-    char bf[15];
-    fprintf(stderr, "meas:volt:dc\r\n"); /* debug command name */
+#include "max5717.h"
+#include "2.476.101.01.BSP.h"
 
-    /* read first parameter if present */
-    if (!SCPI_ParamNumber(context, scpi_special_numbers_def, &param1, FALSE)) {
-        /* do something, if parameter not present */
-    }
+extern MAX5717_t dac1;
 
-    /* read second paraeter if present */
-    if (!SCPI_ParamNumber(context, scpi_special_numbers_def, &param2, FALSE)) {
-        /* do something, if parameter not present */
-    }
+extern volatile float dacOutputVoltage;
+extern volatile float adcInputVoltage;
 
-    SCPI_NumberToStr(context, scpi_special_numbers_def, &param1, bf, 15);
-    fprintf(stderr, "\tP1=%s\r\n", bf);
-
-
-    SCPI_NumberToStr(context, scpi_special_numbers_def, &param2, bf, 15);
-    fprintf(stderr, "\tP2=%s\r\n", bf);
-
-    SCPI_ResultDouble(context, 0);
-
-    return SCPI_RES_OK;
+/**
+  * @brief  save and set a desired output voltage
+	*/
+static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
+{
+	double param1;
+  // fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
+  /* read first parameter if present */
+  if (!SCPI_ParamDouble(context, &param1, TRUE)) {
+		return SCPI_RES_ERR;
+	}
+	
+	dacOutputVoltage = (float)(param1);
+	ETA_CTGS_VoltageOutputSet(&dac1, dacOutputVoltage );
+	
+  return SCPI_RES_OK;
 }
 
-static scpi_result_t DMM_MeasureVoltageAcQ(scpi_t * context) {
-    scpi_number_t param1, param2;
-    char bf[15];
-    fprintf(stderr, "meas:volt:ac\r\n"); /* debug command name */
-
-    /* read first parameter if present */
-    if (!SCPI_ParamNumber(context, scpi_special_numbers_def, &param1, FALSE)) {
-        /* do something, if parameter not present */
-    }
-
-    /* read second paraeter if present */
-    if (!SCPI_ParamNumber(context, scpi_special_numbers_def, &param2, FALSE)) {
-        /* do something, if parameter not present */
-    }
-
-
-    SCPI_NumberToStr(context, scpi_special_numbers_def, &param1, bf, 15);
-    fprintf(stderr, "\tP1=%s\r\n", bf);
-
-
-    SCPI_NumberToStr(context, scpi_special_numbers_def, &param2, bf, 15);
-    fprintf(stderr, "\tP2=%s\r\n", bf);
-
-    SCPI_ResultDouble(context, 0);
-
-    return SCPI_RES_OK;
+/**
+  * @brief  read back the stored voltage
+	*/
+static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
+{
+	double param1 = (double)(dacOutputVoltage);
+	//SCPI_ResultDouble(context, param1);
+	printf("%.4f\r\n", dacOutputVoltage);
+  return SCPI_RES_OK;
 }
 
-static scpi_result_t DMM_ConfigureVoltageDc(scpi_t * context) {
-    double param1, param2;
-    fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
-
-    /* read first parameter if present */
-    if (!SCPI_ParamDouble(context, &param1, TRUE)) {
-        return SCPI_RES_ERR;
-    }
-
-    /* read second paraeter if present */
-    if (!SCPI_ParamDouble(context, &param2, FALSE)) {
-        /* do something, if parameter not present */
-    }
-
-    fprintf(stderr, "\tP1=%lf\r\n", param1);
-    fprintf(stderr, "\tP2=%lf\r\n", param2);
-
-    return SCPI_RES_OK;
+/**
+  * @brief  read back the last measured DC voltage
+	*/
+static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context)
+{
+	double param1 = (double)(adcInputVoltage);
+	//SCPI_ResultDouble(context, param1);
+	printf("%.4f\r\n", adcInputVoltage);
+  return SCPI_RES_OK;
 }
 
 /**
@@ -155,18 +128,13 @@ const scpi_command_t scpi_commands[] = {
     /* {.pattern = "STATus:PRESet", .callback = SCPI_StatusPreset,}, */
 
     /* DMM */
-    {.pattern = "MEASure:VOLTage:DC?", .callback = DMM_MeasureVoltageDcQ,},
-    {.pattern = "CONFigure:VOLTage:DC", .callback = DMM_ConfigureVoltageDc,},
-    {.pattern = "MEASure:VOLTage:DC:RATio?", .callback = SCPI_StubQ,},
-    {.pattern = "MEASure:VOLTage:AC?", .callback = DMM_MeasureVoltageAcQ,},
-    {.pattern = "MEASure:CURRent:DC?", .callback = SCPI_StubQ,},
-    {.pattern = "MEASure:CURRent:AC?", .callback = SCPI_StubQ,},
+    {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
+    {.pattern = "MEASure:CURRent[:DC]?", .callback = SCPI_StubQ,},
     {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,},
-    {.pattern = "MEASure:FRESistance?", .callback = SCPI_StubQ,},
 		
 		/* SOURCE */
-    {.pattern = "SOURce:VOLTage[:LEVel]", .callback = SCPI_StubQ,},
-    {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = SCPI_StubQ,},
+    {.pattern = "SOURce:VOLTage[:LEVel]", .callback = scpi_etaCT_SetVoltage,},
+    {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
     {.pattern = "SOURce:CURRent[:LIMit]", .callback = SCPI_StubQ,},
     {.pattern = "SOURce:CURRent[:LIMit]?", .callback = SCPI_StubQ,},
 		

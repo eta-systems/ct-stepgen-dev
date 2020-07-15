@@ -264,6 +264,7 @@ void TIM4_IRQHandler(void)
   /* USER CODE BEGIN TIM4_IRQn 0 */
 	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 	
+	/*
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);
 	for(uint16_t i=0; i<128; i++);
 	HAL_SPI_Transmit_DMA(dac1.hspix, (uint8_t*)&dmaDacTx[3*dmaPtr], 3);
@@ -271,6 +272,7 @@ void TIM4_IRQHandler(void)
 	dmaPtr++;
 	if(dmaPtr >= dmaBufferSize)
 		dmaPtr = 0;
+	*/
 	
   /* USER CODE END TIM4_IRQn 0 */
   HAL_TIM_IRQHandler(&htim4);

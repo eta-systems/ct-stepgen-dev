@@ -81,13 +81,20 @@ float ETA_CTGS_GetCurrent(float Vhi, float Vlo, CurrentRange_t range)
   * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
   * @param  Vadc measured ADC voltage
   */
-float ETA_CTGS_GetVoltageSense(float Vadc)
+float ETA_CTGS_GetVoltageSense(float vadc)
 {
 	// do a first order correction (offset and gain) 
-	Vadc = ( Vadc * V_MEAS_GAIN ) + V_MEAS_OFFSET;
-	return (Vadc * V_MEAS_ATTENUATION);
+	vadc = (vadc * V_MEAS_ATTENUATION);
+	// do a linear fit with a reference measurement
+	vadc = ( vadc * V_MEAS_GAIN ) + V_MEAS_OFFSET;
+	return vadc;
 }
 
 
+void  ETA_CTGS_VoltageOutputSet (MAX5717_t *dac, float volt)
+{
+	volt = (volt - V_SOURCE_OFFSET) / V_SOURCE_GAIN;
+	MAX5717_SetVoltage(dac, volt);
+}
 
 

@@ -37,7 +37,9 @@ extern "C" {
 #include "stm32f7xx_hal_spi.h"
 #endif
 
-// Voltage Divider R1, R2, R3, R4
+#include "max5717.h"
+
+/* Voltage Divider R1, R2, R3, R4 */
 #define ETA_CTSG_K12 ((1.0f)/(10.0f))
 #define ETA_CTSG_K34 ((1.0f)/(10.0f))
 #define ETA_CTSG_K12_corr ()
@@ -49,13 +51,20 @@ extern "C" {
 #define ETA_CTSG_RS_5_corr    (0.0f)  // calibrated correction value
 #define ETA_CTSG_RS_2500_corr (0.0f)  // calibrated correction value
 
-// V Measurement
+/* Voltage Measurement */
 #define V_MEAS_ATTENUATION (14.000f) // from H-Attenuator
-
 // Calibration and Correction coefficients
-#define V_MEAS_GAIN   (1.0f)
-#define V_MEAS_OFFSET (0.0f)
+#define V_MEAS_GAIN   (0.651829f)// (1.0f)
+#define V_MEAS_OFFSET (0.262203f)// (0.0f)
 
+/* DAC Source */
+#define V_SOURCE_GAIN   (53.3205f)  // (2.0f * 4.7f * 5.6f)  // = 52.64 (ideal) according to gain resistors
+#define V_SOURCE_OFFSET (0.002198f) // (0.0f) ideal
+
+#define V_SOURCE_POS_MAX ( 48.0f)
+#define V_SOURCE_NEG_MAX (-48.0f)
+#define I_SOURCE_POS_MAX ( 2.5f)
+#define I_SOURCE_NEG_MAX (-2.5f)
 
 typedef enum { 
 	RANGE_5mA, 
@@ -63,9 +72,15 @@ typedef enum {
 } CurrentRange_t;
 
 
-void  ETA_CTGS_OutputOff       (void);
-void  ETA_CTGS_CurrentRangeSet (CurrentRange_t range);
-float ETA_CTGS_GetVoltageSense (float Vadc);
+/* Current Sense */
+void  ETA_CTGS_OutputOff        (void);
+void  ETA_CTGS_CurrentRangeSet  (CurrentRange_t range);
+
+/* Voltage Sense */
+float ETA_CTGS_GetVoltageSense  (float vadc);
+
+/* Source (DAC) */
+void  ETA_CTGS_VoltageOutputSet (MAX5717_t *dac, float volt);
 
 
 
