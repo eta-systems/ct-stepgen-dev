@@ -189,9 +189,9 @@ typedef struct {
     uint8_t pga;
     float convFactor;
     uint32_t oscFreq;
-    GPIO_TypeDef *csPort;
+    GPIO_TypeDef csPort;
     uint16_t     csPin;
-    GPIO_TypeDef *drdyPort;
+    GPIO_TypeDef drdyPort;
     uint16_t     drdyPin;
 } ADS125X_t;
 

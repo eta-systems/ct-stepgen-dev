@@ -15,11 +15,33 @@
 #include "main.h"
 #include "2.476.101.01.BSP.h"
 
+/**
+  * @brief  turns on one of the ranging relays
+  * @param  range [RANGE_5mA, RANGE_2500mA]
+  */
+void ETA_CTGS_CurrentRangeSet(CurrentRange_t range){
+	if(range == RANGE_5mA){
+		HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_SET); // turn off first !!!
+		HAL_Delay(50);
+		HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 
-void ETA_CTGS_CurrentRange(uint8_t range){
+		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_SET);  // turn on
+		HAL_Delay(50);
+		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_RESET);
+	} else {
+		HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_SET); // turn off first !!!
+		HAL_Delay(50);
+		HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_RESET);
 
+		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_SET);  // turn on
+		HAL_Delay(50);
+		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_RESET);
+	}
 }
 
+/**
+  * @brief  turns off all outut relays
+  */
 void ETA_CTGS_OutputOff(void){
 	// turn off
 	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port,    R5mA_OFF_Pin,    GPIO_PIN_SET);
@@ -53,3 +75,19 @@ float ETA_CTGS_GetCurrent(float Vhi, float Vlo, CurrentRange_t range)
 	*/
 	return 0;
 }
+
+
+/**
+  * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
+  * @param  Vadc measured ADC voltage
+  */
+float ETA_CTGS_GetVoltageSense(float Vadc)
+{
+	// do a first order correction (offset and gain) 
+	Vadc = ( Vadc * V_MEAS_GAIN ) + V_MEAS_OFFSET;
+	return (Vadc * V_MEAS_ATTENUATION);
+}
+
+
+
+

@@ -31,6 +31,7 @@
 
 #include "circular_buffer.h"
 #include "scpi/scpi.h"
+#include "scpi-def.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,7 +83,7 @@ volatile uint8_t ringBuffer[UART_BUFFER_LENGTH];
 volatile cbuf_handle_t rxBuf;
 volatile uint8_t flagNewline;
 
-scpi_t scpi_context;
+extern scpi_t scpi_context;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,39 +123,29 @@ int ferror(FILE *f){
 }
 /* PRINTF REDIRECT to UART END */
 
-#define SCPI_INPUT_BUFFER_LENGTH 32
-#define SCPI_ERROR_QUEUE_SIZE 17 
-
-int8_t scpi_input_buffer[SCPI_INPUT_BUFFER_LENGTH];
-int16_t scpi_error_queue_data[SCPI_ERROR_QUEUE_SIZE];
-
-const char SCPI_IDN1 = 0x42;
-const char SCPI_IDN2 = 0x43;
-const char SCPI_IDN3 = 0x44;
-const char SCPI_IDN4 = 0x45;
-
-size_t myWrite(scpi_t * context, const char * data, size_t len) {
-    (void) context;
-    return fwrite(data, 1, len, stdout);
+size_t SCPI_Write(scpi_t * context, const char * data, size_t len){
+	(void) context;
+	return fwrite(data, 1, len, stdout);
 }
 
-scpi_result_t DMM_MeasureVoltageDcQ(scpi_t * context){
-	printf("voltmeter\n");
+int SCPI_Error(scpi_t * context, int_fast16_t err){
+	return 0;
+}
+
+scpi_result_t SCPI_Control(scpi_t * context, scpi_ctrl_name_t ctrl, scpi_reg_val_t val){
+	(void) context;
 	return SCPI_RES_OK;
 }
 
-scpi_command_t scpi_commands[] = {
-	{ .pattern = "*IDN?", .callback = SCPI_CoreIdnQ,},
-	{ .pattern = "*RST", .callback = SCPI_CoreRst,},
-  { .pattern = "MEASure:VOLTage:DC?", .callback = DMM_MeasureVoltageDcQ,},
-	SCPI_CMD_LIST_END
-};
+scpi_result_t SCPI_Reset(scpi_t * context){
+	// reset ADCs etc.
+	return SCPI_RES_OK;
+}
 
-scpi_interface_t scpi_interface = {
-	.write = myWrite,
-	.error = NULL,
-	.reset = NULL,
-};
+scpi_result_t SCPI_Flush(scpi_t * context){
+	(void) context;
+	return SCPI_RES_OK;
+}
 
 /* USER CODE END 0 */
 
@@ -208,28 +199,29 @@ int main(void)
 	dac1.csPin     = SPI4_CS_Pin;
 	dac1.latchPort = SPI4_LATCH_GPIO_Port;
 	dac1.latchPin  = SPI4_LATCH_Pin;
-	printf("config MAX5719...");
+	printf("config MAX5719...\n");
 	MAX5717_Init(&dac1, &hspi4, 4.0965f);
 	printf("done\n");
 	
-	adci.csPort   = *SPI1_CS_GPIO_Port;
+	adci.csPort   = SPI1_CS_GPIO_Port;
 	adci.csPin    =  SPI1_CS_Pin;
-	adci.drdyPort = *SPI1_DRDY_GPIO_Port;
+	adci.drdyPort = SPI1_DRDY_GPIO_Port;
 	adci.drdyPin  =  SPI1_DRDY_Pin;
 	adci.vref = 2.5f;
 	adci.hspix = &hspi1;
-	printf("config ADS1256..."); HAL_Delay(1000);
-	//ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	printf("config ADS1256...\n"); 
+	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
 	printf("done\n");
+	HAL_Delay(2000);
 	
-	adcv.csPort   = *SPI3_CS_GPIO_Port;
+	adcv.csPort   = SPI3_CS_GPIO_Port;
 	adcv.csPin    =  SPI3_CS_Pin;
-	adcv.drdyPort = *SPI3_DRDY_GPIO_Port;
+	adcv.drdyPort = SPI3_DRDY_GPIO_Port;
 	adcv.drdyPin  =  SPI3_DRDY_Pin;
 	adcv.vref = 2.5f;
 	adcv.hspix = &hspi3;
-	printf("config ADS1255...");
-	//ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	printf("config ADS1255...\n");
+	ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
 	printf("done\n");
 	
 	float volts = 0.0f;
@@ -237,7 +229,7 @@ int main(void)
 	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
 	
 	
-	uint32_t k = 0;
+	//uint32_t k = 0;
 	
 	float A = ((48.0f / 4.7f)/5.6f);
 	float stepsize = A/(float)DMA_BUFFER_SIZE;
@@ -256,9 +248,9 @@ int main(void)
     scpi_commands,
     &scpi_interface,
     scpi_units_def,
-    &SCPI_IDN1, &SCPI_IDN2, &SCPI_IDN3, &SCPI_IDN4,
+    SCPI_IDN1, SCPI_IDN2, SCPI_IDN3, SCPI_IDN4,
     (char*)&scpi_input_buffer, SCPI_INPUT_BUFFER_LENGTH,
-    (char*)&scpi_error_queue_data, SCPI_ERROR_QUEUE_SIZE);
+    scpi_error_queue_data, SCPI_ERROR_QUEUE_SIZE);
 	
 	HAL_TIM_Base_Start_IT(&htim4);
   HAL_SPI_Transmit_DMA(&hspi4, (uint8_t *)dmaDacTx, 3*DMA_BUFFER_SIZE);
@@ -282,27 +274,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		__nop();
-		
-		HAL_Delay(100);
-		while(flagNewline == 0);
-		
-		flagNewline = 0;
-		HAL_Delay(10);
-		
-		uint8_t parseCmd[UART_BUFFER_LENGTH];
-		uint16_t len = 0;
-		
-		while(!circular_buf_empty(rxBuf))
-		{
-			uint8_t data;
-			circular_buf_get(rxBuf, &data);
-			if(data >= 32 && data <= 126)  // ascii range
-				printf("%u ", data);
-			  parseCmd[len++] = data;
-			// weiterreichen an SCPI parser
-		}
-		printf("\n");
-		SCPI_Parse(&scpi_context, (char *)&parseCmd, len);
+		// HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, HAL_GPIO_ReadPin(SPI1_DRDY_GPIO_Port, SPI1_DRDY_Pin));
 		
   }
   /* USER CODE END 3 */

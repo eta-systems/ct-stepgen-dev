@@ -25,6 +25,9 @@
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
 #include "circular_buffer.h"
+
+#include "scpi/scpi.h"
+#include "scpi-def.h"
 /* USER CODE END Includes */
   
 /* Private typedef -----------------------------------------------------------*/
@@ -81,7 +84,8 @@ volatile extern uint8_t ringBuffer[];
 volatile extern cbuf_handle_t rxBuf;
 volatile extern uint8_t flagNewline;
 
-uint8_t rx;
+char rx;
+extern scpi_t scpi_context;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -240,6 +244,9 @@ void DMA1_Stream0_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)){
+    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+  }
 
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
@@ -299,9 +306,13 @@ void USART3_IRQHandler(void)
 		if(usartRxPrt > 31) usartRxPrt = 0;
 		*/
 		HAL_UART_Receive_IT(&huart3, &rx, 1);
+		/*
 		if(rx == '\r')
 			flagNewline = 1;
 		circular_buf_put(rxBuf, rx);
+		*/
+		// if(data >= 32 && data <= 126)  // ascii range
+		SCPI_Input(&scpi_context, &rx, 1);
 		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 	}
 

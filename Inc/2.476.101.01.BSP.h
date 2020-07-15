@@ -49,14 +49,23 @@ extern "C" {
 #define ETA_CTSG_RS_5_corr    (0.0f)  // calibrated correction value
 #define ETA_CTSG_RS_2500_corr (0.0f)  // calibrated correction value
 
+// V Measurement
+#define V_MEAS_ATTENUATION (14.000f) // from H-Attenuator
+
+// Calibration and Correction coefficients
+#define V_MEAS_GAIN   (1.0f)
+#define V_MEAS_OFFSET (0.0f)
+
+
 typedef enum { 
 	RANGE_5mA, 
-	ANGE_2500mA
+	RANGE_2500mA
 } CurrentRange_t;
 
 
-void ETA_CTGS_OutputOff(void);
-
+void  ETA_CTGS_OutputOff       (void);
+void  ETA_CTGS_CurrentRangeSet (CurrentRange_t range);
+float ETA_CTGS_GetVoltageSense (float Vadc);
 
 
 

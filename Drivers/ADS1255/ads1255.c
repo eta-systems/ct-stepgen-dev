@@ -98,7 +98,7 @@ ADS125X_Register_Write(ads, ADS125X_REG_IO, 0x00); // all GPIOs are outputs (do 
   * @param  *ads pointer to ads handle
   */
 uint8_t ADS125X_DRDY_Wait(ADS125X_t *ads){
-  while(HAL_GPIO_ReadPin(ads->drdyPort, ads->drdyPin) == GPIO_PIN_SET);
+  while(HAL_GPIO_ReadPin(&ads->drdyPort, ads->drdyPin) == GPIO_PIN_SET);
 	return 0;
 }
 
@@ -111,7 +111,7 @@ uint8_t ADS125X_CS(ADS125X_t *ads, uint8_t on)
 {
   if(on) on = 0;
   else on = 1;
-  HAL_GPIO_WritePin( ads->csPort, ads->csPin, on);
+  HAL_GPIO_WritePin( &ads->csPort, ads->csPin, on);
 	return 0;
 }
 
