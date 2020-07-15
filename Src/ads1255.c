@@ -146,7 +146,6 @@ float ADS125X_ADC_ReadVolt (ADS125X_t *ads){
 	spiRx[0] = ADS125X_CMD_RDATA;
 	
 	ADS125X_CS(ads, 1);
-	ADS125X_DRDY_Wait(ads);
 	HAL_SPI_Transmit(ads->hspix, spiRx, 1, 10);
 	HAL_Delay(1);
 	HAL_SPI_Receive(ads->hspix, spiRx, 3, 10);

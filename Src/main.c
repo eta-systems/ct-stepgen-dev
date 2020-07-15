@@ -207,21 +207,21 @@ int main(void)
 	adci.csPin    =  SPI1_CS_Pin;
 	adci.drdyPort = SPI1_DRDY_GPIO_Port;
 	adci.drdyPin  =  SPI1_DRDY_Pin;
-	adci.vref = 2.5f;
+	adci.vref = 2.6613f;
 	adci.hspix = &hspi1;
 	printf("config ADS1256...\n"); 
 	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
 	printf("done\n");
-	HAL_Delay(2000);
+	HAL_Delay(500);
 	
 	adcv.csPort   = SPI3_CS_GPIO_Port;
 	adcv.csPin    =  SPI3_CS_Pin;
 	adcv.drdyPort = SPI3_DRDY_GPIO_Port;
 	adcv.drdyPin  =  SPI3_DRDY_Pin;
-	adcv.vref = 2.5f;
-	adcv.hspix = &hspi3;
+	adcv.vref = 2.6613f;
+	adcv.hspix = &hspi1;
 	printf("config ADS1255...\n");
-	ADS125X_Init(&adci, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
 	printf("done\n");
 	
 	float volts = 0.0f;
@@ -263,6 +263,9 @@ int main(void)
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
   usartRxPrt = 0;
 	flagNewline = 0;
+		
+	ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN0, ADS125X_MUXN_AINCOM);
+	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN0, ADS125X_MUXN_AIN1);
 	
   /* USER CODE END 2 */
 
@@ -274,7 +277,40 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		__nop();
-		// HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, HAL_GPIO_ReadPin(SPI1_DRDY_GPIO_Port, SPI1_DRDY_Pin));
+		/*
+		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
+		float vsens = ADS125X_ADC_ReadVolt(&adcv);
+		//vsens = ETA_CTGS_GetVoltageSense(vsens);
+		printf("%.4f V\n", vsens);
+		*/
+		
+		/*
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
+		ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN0, ADS125X_MUXN_AINCOM);
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
+		float vsens = ADS125X_ADC_ReadVolt(&adci);
+		printf("%.4f V\n", vsens);
+		
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
+		ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN1, ADS125X_MUXN_AINCOM);
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
+		vsens = ADS125X_ADC_ReadVolt(&adci);
+		printf("%.4f V\n", vsens);
+		*/
+		
+		
+		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
+		ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN0, ADS125X_MUXN_AINCOM);
+		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
+		float vsens = ADS125X_ADC_ReadVolt(&adcv);
+		printf("%.4f V\n", vsens);
+		
+		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
+		ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN1, ADS125X_MUXN_AINCOM);
+		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
+		vsens = ADS125X_ADC_ReadVolt(&adcv);
+		printf("%.4f V\n", vsens);
+		
 		
   }
   /* USER CODE END 3 */
