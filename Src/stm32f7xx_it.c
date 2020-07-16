@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
+#include "ads1255.h"
 #include "2.476.101.01.BSP.h"   // Baord Support Package
 #include "scpi/scpi.h"
 #include "scpi-def.h"
@@ -73,12 +74,17 @@ extern TIM_HandleTypeDef htim5;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
 extern MAX5717_t dac1;
+extern ADS125X_t adcv;
+extern ADS125X_t adci;
+
 extern volatile uint8_t dmaDacTx[];
 extern volatile uint16_t dmaPtr;
 extern const uint16_t dmaBufferSize;
 
 extern scpi_t scpi_context;
 extern volatile CurveTracer_State_t deviceState;
+
+extern volatile uint8_t is_config_done;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -237,8 +243,46 @@ void DMA1_Stream0_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+	
+/** @note DRDY Falling Edge Interrupt
+	* PF7 for SPI3 (Voltage)
+	* PA9 for SPI1 (Current)
+	* DRDY low signals that a new sample is ready to be read
+	* for the current measurement, the channel also has to be switched
+	*/
 	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)){
-    HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
+  /** @note DRDY for current ADC
+		* only execute, when not changing channels
+	  */
+		
+  }
+	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)){
+  /** @note DRDY for voltage ADC
+	  */
+		static int32_t pCode;
+		static float pVolt;
+		static uint8_t spiTmp[3];
+		
+		// only execute IRQ if ADC and all peripherals have been initialized
+		if(is_config_done)
+		{  
+			spiTmp[0] = ADS125X_CMD_RDATA;    // request Data read
+			
+			ADS125X_CS(&adcv, 1);   // Chip Select
+			HAL_SPI_Transmit(adcv.hspix, spiTmp, 1, 1);
+			for(uint16_t i=0; i<0xfff; i++) __nop();  // delay
+			HAL_SPI_Receive(adcv.hspix, spiTmp, 3, 1);
+			ADS125X_CS(&adcv, 0);   // Chip Un-Select
+			
+			// Convert to float voltage
+			// must be signed integer for 2's complement to work
+			pCode = (spiTmp[0] << 16) | (spiTmp[1] << 8) | (spiTmp[2]);
+			if(pCode & 0x800000) pCode |= 0xff000000;  // fix 2's complement
+			ADS125X_ADC_Code2Volt(&adcv, &pCode, &pVolt, 1);
+			pVolt = ETA_CTGS_GetVoltageSense(pVolt);
+			
+			deviceState.adcInputVoltage = pVolt; // save to device state
+		}
   }
 
   /* USER CODE END EXTI9_5_IRQn 0 */
@@ -257,7 +301,7 @@ void TIM4_IRQHandler(void)
   /* USER CODE BEGIN TIM4_IRQn 0 */
 	
 /** 
-	* @brief DAC DMA Handler. (Part 1/2)
+	* @note DAC DMA Handler. (Part 1/2)
 	* this interrupt handler is executed on TIM4 event 
 	* - but any event can be used to start the Tx process 
 	* (e.g. a new ADC reading to sync to the ADC sampling rate)
@@ -305,7 +349,7 @@ void USART3_IRQHandler(void)
   /* USER CODE BEGIN USART3_IRQn 0 */
 
 	/**
-	* @brief USART (SCPI) Interface Rx Interrupt
+	* @note USART (SCPI) Interface Rx Interrupt
 	* this function is executed for each byte/char entering the USART3 Bus
 	* the char can be directly forwarded to the SCPI_Input()
 	* the SCPI library has a buffer and automatically detects complete command sequences
@@ -388,7 +432,7 @@ void DMA2_Stream1_IRQHandler(void)
 	// SPI4 DMA Complete
 	
 /** 
-	* @brief DAC DMA Handler. (Part 2/2)
+	* @note DAC DMA Handler. (Part 2/2)
 	* this interrupt handler is executed on DMA Tx Complete
 	* here the CS pin and the LATCH pin need to be toggled
 	*/

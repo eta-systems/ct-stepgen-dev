@@ -80,6 +80,8 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
 		return SCPI_RES_ERR;
 	}
 	
+	/** @todo input boundry check */
+	
 	ETA_CTGS_VoltageOutputSet( (CurveTracer_State_t*)&deviceState, &dac1, (float)(param1) );
 	
   return SCPI_RES_OK;

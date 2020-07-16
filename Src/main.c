@@ -76,6 +76,8 @@ volatile uint16_t dmaPtr;
 extern scpi_t scpi_context;
 volatile CurveTracer_State_t deviceState;
 
+volatile uint8_t is_config_done;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -148,6 +150,7 @@ scpi_result_t SCPI_Flush(scpi_t * context){
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	is_config_done = 0;
 
   /* USER CODE END 1 */
   
@@ -191,9 +194,13 @@ int main(void)
 	ETA_CTGS_InitDAC();
 	ETA_CTGS_InitADC();
 	ETA_CTGS_Init( (CurveTracer_State_t*)& deviceState );
-	
+		
 	printf("2.476.101.01 Step Generator for Curve Tracer\n");
 	printf("(c)2020 - eta systems GmbH\n");
+	
+	HAL_Delay(100);
+	is_config_done = 1;
+
 	
 	//HAL_TIM_Base_Start_IT(&htim4);
 	//HAL_TIM_Base_Start_IT(&htim5);
@@ -212,16 +219,14 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		__nop();
-		/*
-		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
-		float vsens = ADS125X_ADC_ReadVolt(&adcv);
-		//vsens = ETA_CTGS_GetVoltageSense(vsens);
-		printf("%.4f V\n", vsens);
-		*/
+		printf(".\n");
+		HAL_Delay(1000);
 		
+		/*
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
 		float vsens = ADS125X_ADC_ReadVolt(&adci);
 		printf("%.4f V\n", vsens);
+		*/
 		
 		/*
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
@@ -229,14 +234,6 @@ int main(void)
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
 		vsens = ADS125X_ADC_ReadVolt(&adci);
 		printf("%.4f V\n", vsens);
-		*/
-		
-		/*
-		while(HAL_GPIO_ReadPin(adcv.drdyPort, adcv.drdyPin) == GPIO_PIN_SET);
-		float vsens = ADS125X_ADC_ReadVolt(&adcv);
-		vsens = ETA_CTGS_GetVoltageSense(vsens);
-		// printf("%.6f V\n", vsens);
-		adcInputVoltage = vsens;
 		*/
   }
   /* USER CODE END 3 */

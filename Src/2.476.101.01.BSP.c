@@ -102,6 +102,7 @@ void ETA_CTGS_InitADC(void)
 #endif	
 
 	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN1, ADS125X_MUXN_AIN0);
 	
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
@@ -205,7 +206,7 @@ float ETA_CTGS_GetVoltageSense(float vadc)
 	// do a first order correction (offset and gain) 
 	vadc = (vadc * V_MEAS_ATTENUATION);
 	// do a linear fit with a reference measurement
-	vadc = ( vadc * V_MEAS_GAIN ) + V_MEAS_OFFSET;
+	vadc = ( vadc * V_MEAS_GAIN_corr ) + V_MEAS_OFFSET_corr;
 	return vadc;
 }
 
