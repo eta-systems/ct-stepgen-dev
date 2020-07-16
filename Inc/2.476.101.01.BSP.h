@@ -39,6 +39,9 @@ extern "C" {
 
 #include "max5717.h"
 
+#define ETA_CTSG_VREF_DAC (4.0965f)
+#define ETA_CTSG_VREF_ADC (2.6613f)
+
 /* Voltage Divider R1, R2, R3, R4 */
 #define ETA_CTSG_K12 ((1.0f)/(10.0f))
 #define ETA_CTSG_K34 ((1.0f)/(10.0f))
@@ -58,8 +61,9 @@ extern "C" {
 #define V_MEAS_OFFSET (0.262203f)// (0.0f)
 
 /* DAC Source */
-#define V_SOURCE_GAIN   (53.3205f)  // (2.0f * 4.7f * 5.6f)  // = 52.64 (ideal) according to gain resistors
-#define V_SOURCE_OFFSET (0.002198f) // (0.0f) ideal
+#define V_SOURCE_GAIN   (2.0f * 4.7f * 5.6f) // = 52.64 (ideal) according to gain resistors
+#define V_SOURCE_GAIN_corr   (1.000000f)  // (2.0f * 4.7f * 5.6f)  
+#define V_SOURCE_OFFSET_corr (0.002198f) // (0.0f) ideal
 
 #define V_SOURCE_POS_MAX ( 48.0f)
 #define V_SOURCE_NEG_MAX (-48.0f)
@@ -68,19 +72,31 @@ extern "C" {
 
 typedef enum { 
 	RANGE_5mA, 
-	RANGE_2500mA
+	RANGE_2500mA,
+	RANGE_OFF
 } CurrentRange_t;
 
+typedef struct {
+	float dacOutputVoltage;
+	float dacOutputCurrent;
+	float adcInputVoltage;
+	float adcInputCurrent;
+	CurrentRange_t current_range;
+} CurveTracer_State_t;
 
+
+void ETA_CTGS_InitDAC(void);
+void ETA_CTGS_InitADC(void);
+void ETA_CTGS_Init(CurveTracer_State_t *state);
 /* Current Sense */
 void  ETA_CTGS_OutputOff        (void);
-void  ETA_CTGS_CurrentRangeSet  (CurrentRange_t range);
-
+void  ETA_CTGS_CurrentRangeSet  (CurveTracer_State_t *state, CurrentRange_t range);
+void  ETA_CTGS_GetCurrentSense  (float );
 /* Voltage Sense */
 float ETA_CTGS_GetVoltageSense  (float vadc);
-
 /* Source (DAC) */
-void  ETA_CTGS_VoltageOutputSet (MAX5717_t *dac, float volt);
+void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
+void  ETA_CTGS_CurrentOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
 
 
 

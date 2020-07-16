@@ -25,29 +25,48 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-/**
-  * @file   scpi-def.c
-  * @date   2020-07-13
-  * @author eta Systems GmbH
-  * @author Simon Burkhardt
-  * @brief  contains user settings and definitions for SCPI command implementation
-  * @see    https://github.com/j123b567/scpi-parser/blob/master/examples/common/scpi-def.c
-  */
-
+	
+/*******************************************************************************
+  * @file    scpi-def.c
+  * @brief   contains user settings and definitions for SCPI command implementation
+  * @details This file implements constants, math and hardware specific 
+             functionalities
+  * @version 1.0
+  * @author  eta Systems GmbH
+  * @author  Simon Burkhardt
+  * @date    2020-07-13
+  * @copyright (c) 2020 eta systems GmbH
+  * @see https://github.com/j123b567/scpi-parser/blob/master/examples/common/scpi-def.c
+********************************************************************************
+*/
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "scpi/scpi.h"
 #include "scpi-def.h"
-
-#include "max5717.h"
+//#include "max5717.h"
 #include "2.476.101.01.BSP.h"
+/* USER CODE END Includes */
 
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+// #define ENABLE_SCPI_DEBUG_PRINTF
+
+/* USER CODE END PD */
+
+/* External variables --------------------------------------------------------*/
+/* USER CODE BEGIN EV */
 extern MAX5717_t dac1;
+extern volatile CurveTracer_State_t deviceState;
+/* USER CODE END EV */
 
-extern volatile float dacOutputVoltage;
-extern volatile float adcInputVoltage;
+
+/******************************************************************************/
+/*           SCPI Command Callback Handlers                                   */ 
+/******************************************************************************/
 
 /**
   * @brief  save and set a desired output voltage
@@ -61,8 +80,7 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
 		return SCPI_RES_ERR;
 	}
 	
-	dacOutputVoltage = (float)(param1);
-	ETA_CTGS_VoltageOutputSet(&dac1, dacOutputVoltage );
+	ETA_CTGS_VoltageOutputSet( (CurveTracer_State_t*)&deviceState, &dac1, (float)(param1) );
 	
   return SCPI_RES_OK;
 }
@@ -72,9 +90,38 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
 	*/
 static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
 {
-	double param1 = (double)(dacOutputVoltage);
+	double param1 = (double)(deviceState.dacOutputVoltage);
 	//SCPI_ResultDouble(context, param1);
-	printf("%.4f\r\n", dacOutputVoltage);
+	printf("%.4f\r\n", param1);
+  return SCPI_RES_OK;
+}
+
+/**
+  * @brief  save and set a desired output current
+	*/
+static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context)
+{
+	double param1;
+  // fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
+  /* read first parameter if present */
+  if (!SCPI_ParamDouble(context, &param1, TRUE)) {
+		return SCPI_RES_ERR;
+	}
+	
+	// dacOutputVoltage = (float)(param1);
+	//ETA_CTGS_VoltageOutputSet(&dac1, dacOutputVoltage );
+	
+  return SCPI_RES_OK;
+}
+
+/**
+  * @brief  read back the stored current
+	*/
+static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context)
+{
+	double param1 = (double)(deviceState.dacOutputCurrent);
+	//SCPI_ResultDouble(context, param1);
+	printf("%.4f\r\n", param1);
   return SCPI_RES_OK;
 }
 
@@ -83,9 +130,20 @@ static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
 	*/
 static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context)
 {
-	double param1 = (double)(adcInputVoltage);
+	double param1 = (double)(deviceState.adcInputVoltage);
 	//SCPI_ResultDouble(context, param1);
-	printf("%.4f\r\n", adcInputVoltage);
+	printf("%.4f\r\n", deviceState.adcInputVoltage);
+  return SCPI_RES_OK;
+}
+
+/**
+  * @brief  read back the last measured DC current
+	*/
+static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context)
+{
+	double param1 = (double)(deviceState.adcInputVoltage);
+	//SCPI_ResultDouble(context, param1);
+	printf("%.6f\r\n", deviceState.adcInputCurrent);
   return SCPI_RES_OK;
 }
 
@@ -129,14 +187,14 @@ const scpi_command_t scpi_commands[] = {
 
     /* DMM */
     {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
-    {.pattern = "MEASure:CURRent[:DC]?", .callback = SCPI_StubQ,},
-    {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,},
+    {.pattern = "MEASure:CURRent[:DC]?", .callback = scpi_etaCT_MeasureCurrentQ,},
+    /* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
 		
 		/* SOURCE */
     {.pattern = "SOURce:VOLTage[:LEVel]", .callback = scpi_etaCT_SetVoltage,},
     {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
-    {.pattern = "SOURce:CURRent[:LIMit]", .callback = SCPI_StubQ,},
-    {.pattern = "SOURce:CURRent[:LIMit]?", .callback = SCPI_StubQ,},
+    {.pattern = "SOURce:CURRent[:LIMit]", .callback = scpi_etaCT_SetCurrent,},
+    {.pattern = "SOURce:CURRent[:LIMit]?", .callback = scpi_etaCT_SetCurrentQ,},
 		
 		
 

@@ -615,16 +615,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>Drivers/circular_buffer</GroupName>
-          <Files>
-            <File>
-              <FileName>circular_buffer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\circular_buffer\circular_buffer.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
           <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>

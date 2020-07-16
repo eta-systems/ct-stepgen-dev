@@ -36,7 +36,7 @@ SOFTWARE.
 #include <stdint.h>
 #include "ads1255.h"
 
-#define DEBUG_ADS1255
+//#define DEBUG_ADS1255
 
 #ifdef DEBUG_ADS1255
 #include <stdio.h>

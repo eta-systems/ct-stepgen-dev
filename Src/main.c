@@ -23,15 +23,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <arm_math.h>
-#include <stdio.h>
-#include "max5717.h"
-#include "ads1255.h"
-#include "2.476.101.01.BSP.h"
-
-#include "circular_buffer.h"
-#include "scpi/scpi.h"
-#include "scpi-def.h"
+#include <arm_math.h>           // floating point math (sinf ...)
+#include <stdio.h>              // printf
+#include "max5717.h"            // DAC
+#include "ads1255.h"            // ADC
+#include "2.476.101.01.BSP.h"   // Baord Support Package
+#include "scpi/scpi.h"          // SCPI Library
+#include "scpi-def.h"           // SCPI User Code
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,7 +40,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define DMA_BUFFER_SIZE 64
-#define UART_BUFFER_LENGTH 64
 
 /* USER CODE END PD */
 
@@ -76,18 +73,8 @@ volatile uint8_t dmaDacTx [ 3*DMA_BUFFER_SIZE ];
 const uint16_t dmaBufferSize = DMA_BUFFER_SIZE;
 volatile uint16_t dmaPtr;
 
-volatile uint8_t usartRxBuf[32];
-volatile uint8_t usartRxPrt;
-
-volatile uint8_t ringBuffer[UART_BUFFER_LENGTH];
-volatile cbuf_handle_t rxBuf;
-volatile uint8_t flagNewline;
-
 extern scpi_t scpi_context;
-
-volatile float dacOutputVoltage = 0.0f;
-volatile float adcInputVoltage = 0.0f;
-
+volatile CurveTracer_State_t deviceState;
 
 /* USER CODE END PV */
 
@@ -191,92 +178,29 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
+	
+	// initialize SCPI Library
+	SCPI_Init(&scpi_context,
+	scpi_commands,
+	&scpi_interface,
+	scpi_units_def,
+	SCPI_IDN1, SCPI_IDN2, SCPI_IDN3, SCPI_IDN4,
+	(char*)&scpi_input_buffer, SCPI_INPUT_BUFFER_LENGTH,
+	scpi_error_queue_data, SCPI_ERROR_QUEUE_SIZE);
+	
+	ETA_CTGS_InitDAC();
+	ETA_CTGS_InitADC();
+	ETA_CTGS_Init( (CurveTracer_State_t*)& deviceState );
+	
 	printf("2.476.101.01 Step Generator for Curve Tracer\n");
 	printf("(c)2020 - eta systems GmbH\n");
 	
-	ETA_CTGS_OutputOff();
-	HAL_TIM_Base_Start_IT(&htim4);
-	HAL_TIM_Base_Start_IT(&htim5);
-	HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
-  HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
+	//HAL_TIM_Base_Start_IT(&htim4);
+	//HAL_TIM_Base_Start_IT(&htim5);
 	
-	dac1.csPort    = SPI4_CS_GPIO_Port;
-	dac1.csPin     = SPI4_CS_Pin;
-	dac1.latchPort = SPI4_LATCH_GPIO_Port;
-	dac1.latchPin  = SPI4_LATCH_Pin;
-	printf("config MAX5719...\n");
-	MAX5717_Init(&dac1, &hspi4, 4.0965f);
-	printf("done\n");
-	
-	adci.csPort   = SPI1_CS_GPIO_Port;
-	adci.csPin    =  SPI1_CS_Pin;
-	adci.drdyPort = SPI1_DRDY_GPIO_Port;
-	adci.drdyPin  =  SPI1_DRDY_Pin;
-	adci.vref = 2.6613f;
-	adci.hspix = &hspi1;
-	printf("config ADS1256...\n"); 
-	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	printf("done\n");
-	HAL_Delay(500);
-	
-	adcv.csPort   = SPI3_CS_GPIO_Port;
-	adcv.csPin    =  SPI3_CS_Pin;
-	adcv.drdyPort = SPI3_DRDY_GPIO_Port;
-	adcv.drdyPin  =  SPI3_DRDY_Pin;
-	adcv.vref = 2.6613f;
-	adcv.hspix = &hspi3;
-	printf("config ADS1255...\n");
-	//ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	printf("done\n");
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // enable UART Rx Interrupt for SCPI interface
 	
 	float volts = 0.0f;
-	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
-	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
-	
-	
-	//uint32_t k = 0;
-	
-	float A = ((48.0f / 4.7f)/5.6f);
-	float stepsize = A/(float)DMA_BUFFER_SIZE;
-	for(uint16_t i=0; i<DMA_BUFFER_SIZE; i++){
-		volts = (i*stepsize)-(A/2.0f);
-		uint32_t code = MAX5717_VoltageToCode(&dac1, volts);
-		code = code << 4;
-		dmaDacTx[3*i]   = (uint8_t)((code >> 16) & 0xFF);
-		dmaDacTx[3*i+1] = (uint8_t)((code >>  8) & 0xFF);
-		dmaDacTx[3*i+2] = (uint8_t)((code >>  0) & 0xFF);
-		// printf("%.5f,\n", volts);
-		//printf("%d\n", code);
-	}
-	
-	SCPI_Init(&scpi_context,
-    scpi_commands,
-    &scpi_interface,
-    scpi_units_def,
-    SCPI_IDN1, SCPI_IDN2, SCPI_IDN3, SCPI_IDN4,
-    (char*)&scpi_input_buffer, SCPI_INPUT_BUFFER_LENGTH,
-    scpi_error_queue_data, SCPI_ERROR_QUEUE_SIZE);
-	
-	//HAL_TIM_Base_Start_IT(&htim4);
-  //HAL_SPI_Transmit_DMA(&hspi4, (uint8_t *)dmaDacTx, 3*DMA_BUFFER_SIZE);
-
-	
-	HAL_GPIO_WritePin(SPI4_LATCH_GPIO_Port, SPI4_LATCH_Pin, GPIO_PIN_SET);
-	
-	
-	rxBuf = circular_buf_init( (unsigned char*)ringBuffer, UART_BUFFER_LENGTH);
-	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);
-  usartRxPrt = 0;
-	flagNewline = 0;
-		
-	ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN0, ADS125X_MUXN_AINCOM);
-	//ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN1, ADS125X_MUXN_AIN0);
-	MAX5717_SetVoltage(&dac1, 0.0f);
-		
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
-		ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN2, ADS125X_MUXN_AIN5);
-		ADS125X_CMD_Send(&adci, ADS125X_CMD_SYNC);
-		ADS125X_CMD_Send(&adci, ADS125X_CMD_WAKEUP);
 	
   /* USER CODE END 2 */
 

@@ -24,8 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
-#include "circular_buffer.h"
-
+#include "2.476.101.01.BSP.h"   // Baord Support Package
 #include "scpi/scpi.h"
 #include "scpi-def.h"
 /* USER CODE END Includes */
@@ -57,7 +56,7 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+char rx;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -77,15 +76,9 @@ extern MAX5717_t dac1;
 extern volatile uint8_t dmaDacTx[];
 extern volatile uint16_t dmaPtr;
 extern const uint16_t dmaBufferSize;
-extern volatile uint8_t usartRxBuf[32];
-extern volatile uint8_t usartRxPrt;
 
-volatile extern uint8_t ringBuffer[];
-volatile extern cbuf_handle_t rxBuf;
-volatile extern uint8_t flagNewline;
-
-char rx;
 extern scpi_t scpi_context;
+extern volatile CurveTracer_State_t deviceState;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -262,14 +255,23 @@ void EXTI9_5_IRQHandler(void)
 void TIM4_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM4_IRQn 0 */
-	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	
+/** 
+	* @brief DAC DMA Handler. (Part 1/2)
+	* this interrupt handler is executed on TIM4 event 
+	* - but any event can be used to start the Tx process 
+	* (e.g. a new ADC reading to sync to the ADC sampling rate)
+	* here, CS pin is selected, and 3 bytes for the DAC transmitted with DMA
+	* Part 2/2 is the DMA Tx complete interrupt, where the LATCH pin must be toggled
+	*/
 	
 	/*
-	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);
-	for(uint16_t i=0; i<128; i++);
+	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);  // enable CS pin
+	for(uint16_t i=0; i<128; i++);  // delay
+	// transmit 3 bytes in DMA mode
 	HAL_SPI_Transmit_DMA(dac1.hspix, (uint8_t*)&dmaDacTx[3*dmaPtr], 3);
 	
-	dmaPtr++;
+	dmaPtr++;  // next sample in the queue
 	if(dmaPtr >= dmaBufferSize)
 		dmaPtr = 0;
 	*/
@@ -301,21 +303,16 @@ void SPI1_IRQHandler(void)
 void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
+
+	/**
+	* @brief USART (SCPI) Interface Rx Interrupt
+	* this function is executed for each byte/char entering the USART3 Bus
+	* the char can be directly forwarded to the SCPI_Input()
+	* the SCPI library has a buffer and automatically detects complete command sequences
+	*/
 	if(__HAL_UART_GET_IT_SOURCE(&huart3, UART_IT_RXNE) == SET){
-		/*
-		HAL_UART_Receive_IT(&huart3, (uint8_t*)&usartRxBuf[usartRxPrt], 1);
-		usartRxPrt++;
-		if(usartRxPrt > 31) usartRxPrt = 0;
-		*/
-		HAL_UART_Receive_IT(&huart3, &rx, 1);
-		/*
-		if(rx == '\r')
-			flagNewline = 1;
-		circular_buf_put(rxBuf, rx);
-		*/
-		// if(data >= 32 && data <= 126)  // ascii range
+		HAL_UART_Receive_IT(&huart3, (uint8_t*)&rx, 1);  // receive the single char in non-blocking mode
 		SCPI_Input(&scpi_context, &rx, 1);
-		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 	}
 
   /* USER CODE END USART3_IRQn 0 */
@@ -390,16 +387,18 @@ void DMA2_Stream1_IRQHandler(void)
   /* USER CODE BEGIN DMA2_Stream1_IRQn 0 */
 	// SPI4 DMA Complete
 	
-	for(uint16_t i=0; i<0x1fff; i++);
+/** 
+	* @brief DAC DMA Handler. (Part 2/2)
+	* this interrupt handler is executed on DMA Tx Complete
+	* here the CS pin and the LATCH pin need to be toggled
+	*/
+	for(uint16_t i=0; i<0x1fff; i++);  // delay
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
 	
+	// latch sample to DAC output
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_RESET);
-	for(uint16_t i=0; i<128;  i++);
+	for(uint16_t i=0; i<128;  i++);    // delay
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_SET);
-	
-	
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
   /* USER CODE END DMA2_Stream1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi4_tx);
