@@ -282,6 +282,7 @@ void EXTI9_5_IRQHandler(void)
 			pVolt = ETA_CTGS_GetVoltageSense(pVolt);
 			
 			deviceState.adcInputVoltage = pVolt; // save to device state
+			// printf("%.4f\n", pVolt);
 		}
   }
 

@@ -80,7 +80,10 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
 		return SCPI_RES_ERR;
 	}
 	
-	/** @todo input boundry check */
+	/* input boundry check */
+	if( (param1 > V_SOURCE_POS_MAX) || (param1 < V_SOURCE_NEG_MAX) ){
+		return SCPI_RES_ERR;
+	}
 	
 	ETA_CTGS_VoltageOutputSet( (CurveTracer_State_t*)&deviceState, &dac1, (float)(param1) );
 	
@@ -134,7 +137,7 @@ static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context)
 {
 	double param1 = (double)(deviceState.adcInputVoltage);
 	//SCPI_ResultDouble(context, param1);
-	printf("%.4f\r\n", deviceState.adcInputVoltage);
+	printf("%.8f\r\n", deviceState.adcInputVoltage);
   return SCPI_RES_OK;
 }
 

@@ -219,8 +219,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 		__nop();
-		printf(".\n");
-		HAL_Delay(1000);
+		//printf(".\n");
+		//HAL_Delay(1000);
 		
 		/*
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
@@ -229,12 +229,77 @@ int main(void)
 		*/
 		
 		/*
+		float vsens;
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
 		ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN1, ADS125X_MUXN_AINCOM);
 		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
 		vsens = ADS125X_ADC_ReadVolt(&adci);
 		printf("%.4f V\n", vsens);
 		*/
+		static uint8_t spiDat[5];
+		static uint8_t spiRx[5];
+		static float volt1;
+		static int32_t adsCode;
+		static uint8_t p=0;
+		static float volt2;
+		
+		/*
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
+		
+		ADS125X_Register_Write(&adci, ADS125X_REG_MUX, 0 | p++);
+		ADS125X_CMD_Send(&adci, ADS125X_CMD_SYNC);
+		ADS125X_CMD_Send(&adci, ADS125X_CMD_WAKEUP);
+		uint8_t tmp = 0;
+		HAL_Delay(1);
+		ADS125X_Register_Read(&adci, ADS125X_REG_MUX, &tmp, 1);
+		printf("MUX  : %#.2x\n", tmp);
+	
+		HAL_Delay(500);
+		*/
+
+		ADS125X_CS(&adci, 1);
+		
+		spiDat[0] = ADS125X_CMD_WREG | ADS125X_REG_MUX;	
+		spiDat[1] = 1 -1;  // payload length = 3 bytes -1
+		spiDat[2] = ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5;
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
+		HAL_SPI_Transmit(adci.hspix, spiDat, 3, 10);
+		
+		spiRx[0] = ADS125X_CMD_RDATA;
+		HAL_SPI_Transmit(adci.hspix, spiRx, 1, 10);
+		HAL_Delay(1);
+		HAL_SPI_Receive(adci.hspix, spiRx, 3, 10);
+		adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
+		if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
+		volt1 = ( (float)adsCode * (2.0f * adci.vref) ) / ( adci.pga * 8388607.0f );  // 0x7fffff = 8388607.0f
+		
+		//printf("0x23 %.10f\n", volt);
+		ADS125X_CS(&adci, 0); 
+		HAL_Delay(250);
+		
+		ADS125X_CS(&adci, 1);
+		spiDat[0] = ADS125X_CMD_WREG | ADS125X_REG_MUX;	
+		spiDat[1] = 1 -1;  // payload length = 3 bytes -1
+		spiDat[2] = ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3;
+		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
+		HAL_SPI_Transmit(adci.hspix, spiDat, 3, 10);
+		
+		spiRx[0] = ADS125X_CMD_RDATA;
+		HAL_SPI_Transmit(adci.hspix, spiRx, 1, 10);
+		HAL_Delay(1);
+		HAL_SPI_Receive(adci.hspix, spiRx, 3, 10);
+		adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
+		if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
+		volt2 = ( (float)adsCode * (2.0f * adci.vref) ) / ( adci.pga * 8388607.0f );  // 0x7fffff = 8388607.0f
+		
+		//printf("0x45 %.10f\n", volt);
+		ADS125X_CS(&adci, 0);
+		HAL_Delay(250);
+		
+		// printf("%.10f, %.10f\n", volt1, volt2);
+		ETA_CTGS_GetCurrentSense(volt2, volt1, RANGE_5mA);
+		
+		
   }
   /* USER CODE END 3 */
 }

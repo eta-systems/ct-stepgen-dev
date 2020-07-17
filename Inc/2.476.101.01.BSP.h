@@ -40,31 +40,31 @@ extern "C" {
 #include "max5717.h"
 
 /* Voltage References */
-#define ETA_CTSG_VREF_DAC (4.0965f)  /** @see Messprotokoll: CALVADC-001 */
-#define ETA_CTSG_VREF_ADC (2.6613f)  /** @see Messprotokoll: CALVADC-001 */
+#define V_REF_LM4140  (2.4985f)  /** @see Messprotokoll: MEASVREF20200717 */
+#define V_REF_ADS1255 (2.4923f)  /** @see Messprotokoll: MEASVREF20200717 */
+#define V_REF_ADS1256 (2.4926f)  /** @see Messprotokoll: MEASVREF20200717 */
+#define V_REF_DAC     (4.0952f)  /** @see Messprotokoll: MEASVREF20200717 */
 
 /* Voltage Divider R1, R2, R3, R4 */
-#define ETA_CTSG_K12 ((1.0f)/(10.0f))
-#define ETA_CTSG_K34 ((1.0f)/(10.0f))
-#define ETA_CTSG_K12_corr ()
-#define ETA_CTSG_K34_corr ()
-#define ETA_CTSG_R12 (110000.0f)    // in Ohms
-#define ETA_CTSG_R34 (110000.0f)    // in Ohms
-#define ETA_CTSG_RS_5    (200.0f)   // Sense R in Ohms
-#define ETA_CTSG_RS_2500 (0.4f)     // Sense R in Ohm
-#define ETA_CTSG_RS_5_corr    (0.0f)  // calibrated correction value
-#define ETA_CTSG_RS_2500_corr (0.0f)  // calibrated correction value
+#define V_DIV_R1  (100000.0f)
+#define V_DIV_R2  ( 10000.0f)
+#define V_DIV_R3  (100000.0f)
+#define V_DIV_R4  ( 10000.0f)
+#define RS_5    (200.0f)   // Sense R in Ohms
+#define RS_2500 (0.4f)     // Sense R in Ohm
+#define RS_5_corr    (0.0f)  // calibrated correction value
+#define RS_2500_corr (0.0f)  // calibrated correction value
 
 /* Voltage Measurement */
 #define V_MEAS_ATTENUATION (14.000f) // from H-Attenuator
 // Calibration and Correction coefficients
-#define V_MEAS_GAIN_corr   (0.651829f)  /** @see Kalibrationsprotokoll: CALVADC-001 */
-#define V_MEAS_OFFSET_corr (0.262203f)  /** @see Kalibrationsprotokoll: CALVADC-001 */
+#define V_MEAS_GAIN_corr   (0.6287877729784f)  /** @see Kalibrationsprotokoll: CALVADC20200717 */
+#define V_MEAS_OFFSET_corr (0.1059730569664f)  /** @see Kalibrationsprotokoll: CALVADC20200717 */
 
 /* DAC Source */
 #define V_SOURCE_GAIN   (2.0f * 4.7f * 5.6f) // = 52.64 (ideal) according to gain resistors
-#define V_SOURCE_GAIN_corr   (1.000000f)  /** @see Kalibrationsprotokoll: CALVDAC-001 */
-#define V_SOURCE_OFFSET_corr (0.002198f)  /** @see Kalibrationsprotokoll: CALVDAC-001 */
+#define V_SOURCE_GAIN_corr   (1.0f) // (0.9873352667878f)  /** @see Kalibrationsprotokoll: CALVFORCE20200717 */
+#define V_SOURCE_OFFSET_corr (0.0f) // (0.9873352667878f)   /** @see Kalibrationsprotokoll: CALVFORCE20200717 */
 
 #define V_SOURCE_POS_MAX ( 48.0f)
 #define V_SOURCE_NEG_MAX (-48.0f)
@@ -95,7 +95,7 @@ void ETA_CTGS_Init(CurveTracer_State_t *state);
 /* Current Sense */
 void  ETA_CTGS_OutputOff        (void);
 void  ETA_CTGS_CurrentRangeSet  (CurveTracer_State_t *state, CurrentRange_t range);
-void  ETA_CTGS_GetCurrentSense  (float );
+float ETA_CTGS_GetCurrentSense  (float Vhi, float Vlo, CurrentRange_t range);
 /* Voltage Sense */
 float ETA_CTGS_GetVoltageSense  (float vadc);
 /* Source (DAC) */

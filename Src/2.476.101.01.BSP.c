@@ -57,7 +57,7 @@ void ETA_CTGS_InitDAC(void)
 	printf("config MAX5717...\n");
 #endif
 	
-	MAX5717_Init(&dac1, &hspi4, ETA_CTSG_VREF_DAC);
+	MAX5717_Init(&dac1, &hspi4, V_REF_DAC);
 	
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
@@ -75,7 +75,7 @@ void ETA_CTGS_InitADC(void)
 	adci.csPin    =  SPI1_CS_Pin;
 	adci.drdyPort = SPI1_DRDY_GPIO_Port;
 	adci.drdyPin  =  SPI1_DRDY_Pin;
-	adci.vref = ETA_CTSG_VREF_ADC;
+	adci.vref = V_REF_ADS1256;
 	adci.hspix = &hspi1;
 	
 #ifdef ENABLE_BSP_DEBUG_PRINTF
@@ -94,7 +94,7 @@ void ETA_CTGS_InitADC(void)
 	adcv.csPin    =  SPI3_CS_Pin;
 	adcv.drdyPort = SPI3_DRDY_GPIO_Port;
 	adcv.drdyPin  =  SPI3_DRDY_Pin;
-	adcv.vref = ETA_CTSG_VREF_ADC;
+	adcv.vref = V_REF_ADS1255;
 	adcv.hspix = &hspi3;
 	
 #ifdef ENABLE_BSP_DEBUG_PRINTF
@@ -172,29 +172,35 @@ void ETA_CTGS_OutputOff(void){
 	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 }
 
-float ETA_CTGS_GetCurrent(float Vhi, float Vlo, CurrentRange_t range)
+float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 {
-	/*
-	const float k12 = ETA_CTSG_K12;
-	const float k34 = ETA_CTSG_K34;
-	const float R12 = ETA_CTSG_R12;
-	const float R34 = ETA_CTSG_R34;
-
-	float Vforce = Vhi / (k12 + c12);
-	float Vdut = Vlo / (k34 + c34);
-
-	float iMeas = 0.0f;
-	float Rs = 0.0f;
-
+	static float Vdut;
+	static float Rs;
+	static float Idut;
+	static float Ibias;
+	static float Vshunt;
+	
 	if(range == RANGE_5mA){
-		Rs = ETA_CTSG_RS_5 + ETA_CTSG_RS_5_corr;
+		Rs = RS_5 + RS_5_corr;
 	} else {
-		Rs = ETA_CTSG_RS_2500 + ETA_CTSG_RS_2500_corr;
+		Rs = RS_2500 + RS_2500_corr;
 	}
-
-	iMeas = (Vforce - Vdut) / (Rs);
-	*/
-	return 0;
+	
+	/** @see Equation (3.4) */
+	Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
+	
+	/** @see Equation (3.3) */
+	Ibias = Vlo / V_DIV_R4;
+  
+	/** @see Equation (3.2) */
+	Vshunt = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) ) - Vdut;
+	
+	/** @see Equation (3.1) */
+	Idut = ( Vshunt / Rs ) - Ibias;
+	
+	printf("%.5f mA, %.4f V, %.2f R, %.3f W\n", 1000.0f*Idut, Vdut, Vdut/Idut, Vdut*Idut);
+	
+	return Idut;
 }
 
 /**
@@ -203,8 +209,8 @@ float ETA_CTGS_GetCurrent(float Vhi, float Vlo, CurrentRange_t range)
   */
 float ETA_CTGS_GetVoltageSense(float vadc)
 {
-	// do a first order correction (offset and gain) 
 	vadc = (vadc * V_MEAS_ATTENUATION);
+	// do a first order correction (offset and gain) 
 	// do a linear fit with a reference measurement
 	vadc = ( vadc * V_MEAS_GAIN_corr ) + V_MEAS_OFFSET_corr;
 	return vadc;
@@ -222,8 +228,8 @@ void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, flo
 	// input value is +/- 48V
 	// DAC output is +/- 2.048V
 	// so divide by the gain, subtract offset...
-	volt = volt / V_SOURCE_GAIN; // ideal gain
 	volt = (volt - V_SOURCE_OFFSET_corr) / V_SOURCE_GAIN_corr;
+	volt = volt / V_SOURCE_GAIN; // ideal gain
 	MAX5717_SetVoltage(dac, volt);
 	state->dacOutputVoltage = volt;
 }
