@@ -55,16 +55,21 @@ extern "C" {
 #define RS_5_corr    (0.0f)  // calibrated correction value
 #define RS_2500_corr (0.0f)  // calibrated correction value
 
+#define VDUT_GAIN_corr     (1.001568195399f)      /** @see Messprotokoll: MEASVREF20200717 */
+#define VDUT_OFFSET_corr   (0.004727775287749f)   /** @see Messprotokoll: MEASVREF20200717 */
+#define VFORCE_GAIN_corr   (1.000184160203f)      /** @see Messprotokoll: MEASVREF20200717 */
+#define VFORCE_OFFSET_corr (0.002076113737264f)   /** @see Messprotokoll: MEASVREF20200717 */
+
 /* Voltage Measurement */
 #define V_MEAS_ATTENUATION (14.000f) // from H-Attenuator
 // Calibration and Correction coefficients
-#define V_MEAS_GAIN_corr   (0.6287877729784f)  /** @see Kalibrationsprotokoll: CALVADC20200717 */
-#define V_MEAS_OFFSET_corr (0.1059730569664f)  /** @see Kalibrationsprotokoll: CALVADC20200717 */
+#define V_MEAS_GAIN_corr   ( 0.9822487775312f ) /** @see Kalibrationsprotokoll: CALVADC20200723 */
+#define V_MEAS_OFFSET_corr (-0.01392705932735f) /** @see Kalibrationsprotokoll: CALVADC20200723 */
 
 /* DAC Source */
-#define V_SOURCE_GAIN   (2.0f * 4.7f * 5.6f) // = 52.64 (ideal) according to gain resistors
-#define V_SOURCE_GAIN_corr   (1.0f) // (0.9873352667878f)  /** @see Kalibrationsprotokoll: CALVFORCE20200717 */
-#define V_SOURCE_OFFSET_corr (0.0f) // (0.9873352667878f)   /** @see Kalibrationsprotokoll: CALVFORCE20200717 */
+#define V_SOURCE_GAIN   (2.0f * 4.7f * 5.6f)              // = 52.64 (ideal) according to gain resistors
+#define V_SOURCE_GAIN_corr   ((1.0f)/(0.98607345444812f)) /** @see Kalibrationsprotokoll: CALVFORCE20200723 */
+#define V_SOURCE_OFFSET_corr (-(-0.01406580558101))       /** @see Kalibrationsprotokoll: CALVFORCE20200723 */
 
 #define V_SOURCE_POS_MAX ( 48.0f)
 #define V_SOURCE_NEG_MAX (-48.0f)
@@ -84,9 +89,21 @@ typedef struct {
 	float dacOutputCurrent;
 	float adcInputVoltage;
 	float adcInputCurrent;
+	float adcVhi;
+	float adcVlo;
+	float adcVforce;
+	float adcVdut;
+	
 	CurrentRange_t current_range;
 } CurveTracer_State_t;
 
+typedef enum {
+	DMA_STATE_Ready,
+	DMA_STATE_Tx_MUX,
+	DMA_STATE_Tx_WKUP,
+	DMA_STATE_Tx_RDATA,
+	DMA_STATE_Rx_ADC
+} ADS1255_DMA_State_t;
 
 /* Init */
 void ETA_CTGS_InitDAC(void);

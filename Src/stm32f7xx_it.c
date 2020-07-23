@@ -58,6 +58,8 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 char rx;
+ADS1255_DMA_State_t ads1256_state = DMA_STATE_Ready;
+int32_t adsCode;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -85,6 +87,10 @@ extern scpi_t scpi_context;
 extern volatile CurveTracer_State_t deviceState;
 
 extern volatile uint8_t is_config_done;
+
+extern uint8_t TxDMAchannelCycle[];
+extern uint8_t TxDMABufferOffsetStep;
+extern uint8_t TxDMABufferOffset;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -254,7 +260,20 @@ void EXTI9_5_IRQHandler(void)
   /** @note DRDY for current ADC
 		* only execute, when not changing channels
 	  */
-		
+		if(is_config_done)
+		{ 
+			switch(ads1256_state){
+				case DMA_STATE_Ready:
+					ads1256_state = DMA_STATE_Tx_MUX;
+					for(uint16_t i=0; i<0xff; i++) __nop();  // delay
+					/** Send first 4 bytes for the MUX register */
+					HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*)&TxDMAchannelCycle[0+TxDMABufferOffset], 4); // MUX
+					break;
+				default:
+					break;
+					ads1256_state = DMA_STATE_Ready;
+			}
+		}
   }
 	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)){
   /** @note DRDY for voltage ADC
@@ -279,10 +298,12 @@ void EXTI9_5_IRQHandler(void)
 			pCode = (spiTmp[0] << 16) | (spiTmp[1] << 8) | (spiTmp[2]);
 			if(pCode & 0x800000) pCode |= 0xff000000;  // fix 2's complement
 			ADS125X_ADC_Code2Volt(&adcv, &pCode, &pVolt, 1);
+			pVolt *= 2.0f;  /** @todo voltage is wrong by a factor of 2 - why? */
+			// printf("%.4f\t", pVolt);
 			pVolt = ETA_CTGS_GetVoltageSense(pVolt);
 			
 			deviceState.adcInputVoltage = pVolt; // save to device state
-			// printf("%.4f\n", pVolt);
+			//printf("%.4f\n", pVolt);
 		}
   }
 
@@ -495,6 +516,62 @@ void SPI4_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
+/**
+  * @brief SPI DMA Transmit Complete Interrupt
+  */
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi){
+	if(hspi == adci.hspix){
+		if(is_config_done)
+		{ 
+			static uint8_t dmaRx[3];
+			static float volt2;
+			
+			switch(ads1256_state){
+				case DMA_STATE_Tx_MUX:
+					ads1256_state = DMA_STATE_Tx_WKUP;
+					for(uint16_t i=0; i<0xff; i++);
+					/** send WAKEUP Command */
+					HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*)&TxDMAchannelCycle[4+TxDMABufferOffset], 1); // WAKEUP
+					break;
+				
+				case DMA_STATE_Tx_WKUP:
+					ads1256_state = DMA_STATE_Tx_RDATA;
+					for(uint16_t i=0; i<0xff; i++);
+					/** send Request for Data Read */
+					HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*)&TxDMAchannelCycle[5+TxDMABufferOffset], 1); // RDATA
+					break;
+				
+				case DMA_STATE_Tx_RDATA:
+					ads1256_state = DMA_STATE_Rx_ADC;
+					for(uint16_t i=0; i<128; i++);
+					/** Receive 3 bytes */
+					HAL_SPI_Receive_DMA(adci.hspix, (uint8_t*)&dmaRx[0], 3); // RDATA
+				
+					adsCode = (dmaRx[0] << 16) | (dmaRx[1] << 8) | (dmaRx[2]);
+					if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
+					volt2 = ( (float)adsCode * (2.0f * adci.vref) ) / ( adci.pga * 8388607.0f );  // 0x7fffff = 8388607.0f
+				
+					/** @todo Vhi and Vlo are swapped for some reason ?? */
+					// shift buffer offset for other MUX bytes
+					if(TxDMABufferOffset == 0){
+						TxDMABufferOffset = TxDMABufferOffsetStep;
+						// this means the just sampled value is for ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3 = Vlo
+						deviceState.adcVhi = volt2;
+					} else {
+						TxDMABufferOffset = 0;
+						// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
+						deviceState.adcVlo = volt2;
+					}
+					ETA_CTGS_GetCurrentSense(deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
+					ads1256_state = DMA_STATE_Ready;
+					break;
+				
+				case DMA_STATE_Rx_ADC:
+				default:
+					ads1256_state = DMA_STATE_Ready;
+			}
+		}
+	}
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

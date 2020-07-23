@@ -338,7 +338,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F746xx,USE_HAL_DRIVER,STM32F746xx,ARM_MATH_CM7</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;../Drivers/STM32F7xx_HAL_Driver/Inc;../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F7xx/Include;../Drivers/CMSIS/Include;../Drivers/CMSIS/DSP;../Drivers/CMSIS/DSP/Include;../Drivers/libscpi/inc;../Drivers/circular_buffer</IncludePath>
+              <IncludePath>../Inc; ../Drivers/STM32F7xx_HAL_Driver/Inc; ../Drivers/STM32F7xx_HAL_Driver/Inc/Legacy; ../Drivers/CMSIS/Device/ST/STM32F7xx/Include; ../Drivers/CMSIS/Include; ../Drivers/CMSIS/DSP; ../Drivers/CMSIS/DSP/Include; ../Drivers/libscpi/inc; ../Drivers/circular_buffer</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -408,6 +408,11 @@
               <FilePath>..\Src\max5717.c</FilePath>
             </File>
             <File>
+              <FileName>scpi-def.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\scpi-def.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/main.c</FilePath>
@@ -421,11 +426,6 @@
               <FileName>stm32f7xx_hal_msp.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Src/stm32f7xx_hal_msp.c</FilePath>
-            </File>
-            <File>
-              <FileName>scpi-def.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\scpi-def.c</FilePath>
             </File>
           </Files>
         </Group>

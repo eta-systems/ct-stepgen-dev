@@ -181,6 +181,7 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
+	ETA_CTGS_OutputOff();
 	
 	// initialize SCPI Library
 	SCPI_Init(&scpi_context,
@@ -194,20 +195,31 @@ int main(void)
 	ETA_CTGS_InitDAC();
 	ETA_CTGS_InitADC();
 	ETA_CTGS_Init( (CurveTracer_State_t*)& deviceState );
+	
+	ETA_CTGS_OutputOff();
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)& deviceState, RANGE_5mA);
 		
 	printf("2.476.101.01 Step Generator for Curve Tracer\n");
 	printf("(c)2020 - eta systems GmbH\n");
 	
-	HAL_Delay(100);
-	is_config_done = 1;
-
+	printf("2.5\n");
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
+	HAL_Delay(1000);
+	printf("0.005\n");
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
+	HAL_Delay(1000);
+	printf("2.5\n");
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
+	HAL_Delay(1000);
+	printf("0.005\n");
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
+	HAL_Delay(1000);
 	
-	//HAL_TIM_Base_Start_IT(&htim4);
-	//HAL_TIM_Base_Start_IT(&htim5);
+	HAL_Delay(10);
+	ADS125X_CS(&adci, 1);  // chip select always enabled for DMA Transfer
+	is_config_done = 1;    // signal setup complete to ISRs
 	
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // enable UART Rx Interrupt for SCPI interface
-	
-	float volts = 0.0f;
 	
   /* USER CODE END 2 */
 
@@ -218,87 +230,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		__nop();
-		//printf(".\n");
-		//HAL_Delay(1000);
-		
-		/*
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
-		float vsens = ADS125X_ADC_ReadVolt(&adci);
-		printf("%.4f V\n", vsens);
-		*/
-		
-		/*
-		float vsens;
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
-		ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN1, ADS125X_MUXN_AINCOM);
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);
-		vsens = ADS125X_ADC_ReadVolt(&adci);
-		printf("%.4f V\n", vsens);
-		*/
-		static uint8_t spiDat[5];
-		static uint8_t spiRx[5];
-		static float volt1;
-		static int32_t adsCode;
-		static uint8_t p=0;
-		static float volt2;
-		
-		/*
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
-		
-		ADS125X_Register_Write(&adci, ADS125X_REG_MUX, 0 | p++);
-		ADS125X_CMD_Send(&adci, ADS125X_CMD_SYNC);
-		ADS125X_CMD_Send(&adci, ADS125X_CMD_WAKEUP);
-		uint8_t tmp = 0;
-		HAL_Delay(1);
-		ADS125X_Register_Read(&adci, ADS125X_REG_MUX, &tmp, 1);
-		printf("MUX  : %#.2x\n", tmp);
-	
-		HAL_Delay(500);
-		*/
-
-		ADS125X_CS(&adci, 1);
-		
-		spiDat[0] = ADS125X_CMD_WREG | ADS125X_REG_MUX;	
-		spiDat[1] = 1 -1;  // payload length = 3 bytes -1
-		spiDat[2] = ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5;
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
-		HAL_SPI_Transmit(adci.hspix, spiDat, 3, 10);
-		
-		spiRx[0] = ADS125X_CMD_RDATA;
-		HAL_SPI_Transmit(adci.hspix, spiRx, 1, 10);
-		HAL_Delay(1);
-		HAL_SPI_Receive(adci.hspix, spiRx, 3, 10);
-		adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
-		if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
-		volt1 = ( (float)adsCode * (2.0f * adci.vref) ) / ( adci.pga * 8388607.0f );  // 0x7fffff = 8388607.0f
-		
-		//printf("0x23 %.10f\n", volt);
-		ADS125X_CS(&adci, 0); 
+		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 		HAL_Delay(250);
-		
-		ADS125X_CS(&adci, 1);
-		spiDat[0] = ADS125X_CMD_WREG | ADS125X_REG_MUX;	
-		spiDat[1] = 1 -1;  // payload length = 3 bytes -1
-		spiDat[2] = ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3;
-		while(HAL_GPIO_ReadPin(adci.drdyPort, adci.drdyPin) == GPIO_PIN_SET);  // wait for DRDY to go low
-		HAL_SPI_Transmit(adci.hspix, spiDat, 3, 10);
-		
-		spiRx[0] = ADS125X_CMD_RDATA;
-		HAL_SPI_Transmit(adci.hspix, spiRx, 1, 10);
-		HAL_Delay(1);
-		HAL_SPI_Receive(adci.hspix, spiRx, 3, 10);
-		adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
-		if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
-		volt2 = ( (float)adsCode * (2.0f * adci.vref) ) / ( adci.pga * 8388607.0f );  // 0x7fffff = 8388607.0f
-		
-		//printf("0x45 %.10f\n", volt);
-		ADS125X_CS(&adci, 0);
-		HAL_Delay(250);
-		
-		// printf("%.10f, %.10f\n", volt1, volt2);
-		ETA_CTGS_GetCurrentSense(volt2, volt1, RANGE_5mA);
-		
 		
   }
   /* USER CODE END 3 */

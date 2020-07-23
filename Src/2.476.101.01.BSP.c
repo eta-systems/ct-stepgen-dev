@@ -26,6 +26,7 @@
 /* USER CODE BEGIN PD */
 
 // #define ENABLE_BSP_DEBUG_PRINTF
+// #define ENABLE_BSP_VALUES_PRINTF
 
 /* USER CODE END PD */
 
@@ -37,6 +38,10 @@ extern ADS125X_t adci;
 extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi4;
+
+uint8_t TxDMAchannelCycle[16];
+uint8_t TxDMABufferOffsetStep;
+uint8_t TxDMABufferOffset;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -69,6 +74,7 @@ void ETA_CTGS_InitDAC(void)
   */
 void ETA_CTGS_InitADC(void)
 {
+	/* ADS1256 must be initialized first because of CLKOUT to ADS1255 */
   HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);  // SYNC Pin is PDWN Pin --> turn on ADS125x
 	
 	adci.csPort   = SPI1_CS_GPIO_Port;
@@ -101,13 +107,32 @@ void ETA_CTGS_InitADC(void)
 	printf("config ADS1255...\n");
 #endif	
 
-	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN1, ADS125X_MUXN_AIN0);
+	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA2, 0);    // PGA=2
+	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN0, ADS125X_MUXN_AIN1);
 	
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
 #endif	
 
+	/* prepare DMA Buffer for fast channel cycling */
+	// CHANNEL 4/5
+	TxDMAchannelCycle[0] = ADS125X_CMD_WREG | ADS125X_REG_MUX;
+	TxDMAchannelCycle[1] = 0x00;
+	TxDMAchannelCycle[2] = ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5;  // Vhi
+	TxDMAchannelCycle[3] = ADS125X_CMD_SYNC;
+	TxDMAchannelCycle[4] = ADS125X_CMD_WAKEUP;
+	TxDMAchannelCycle[5] = ADS125X_CMD_RDATA;
+	
+	// CHANNEL 2/3
+	TxDMAchannelCycle[6]  = ADS125X_CMD_WREG | ADS125X_REG_MUX;
+	TxDMAchannelCycle[7]  = 0x00;
+	TxDMAchannelCycle[8]  = ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3;  // Vlo
+	TxDMAchannelCycle[9]  = ADS125X_CMD_SYNC;
+	TxDMAchannelCycle[10] = ADS125X_CMD_WAKEUP;
+	TxDMAchannelCycle[11] = ADS125X_CMD_RDATA;
+	
+	TxDMABufferOffsetStep = 6;
+	TxDMABufferOffset = 0;
 }
 
 /**
@@ -141,19 +166,12 @@ void ETA_CTGS_Init(CurveTracer_State_t *state)
   * @param  range [RANGE_5mA, RANGE_2500mA]
   */
 void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range){
+	ETA_CTGS_OutputOff();  // turn off  first!
 	if(range == RANGE_5mA){
-		HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_SET); // turn off first !!!
-		HAL_Delay(50);
-		HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
-
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_SET);  // turn on
 		HAL_Delay(50);
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_RESET);
 	} else {
-		HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_SET); // turn off first !!!
-		HAL_Delay(50);
-		HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_RESET);
-
 		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_SET);  // turn on
 		HAL_Delay(50);
 		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_RESET);
@@ -166,14 +184,15 @@ void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range){
 void ETA_CTGS_OutputOff(void){
 	// turn off
 	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port,    R5mA_OFF_Pin,    GPIO_PIN_SET);
-	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port,    R25A_OFF_Pin,    GPIO_PIN_SET);
 	HAL_Delay(50);
 	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port,    R5mA_OFF_Pin,    GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port,    R25A_OFF_Pin,    GPIO_PIN_RESET);
 }
 
 float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 {
+	static float Vforce;
 	static float Vdut;
 	static float Rs;
 	static float Idut;
@@ -186,20 +205,34 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 		Rs = RS_2500 + RS_2500_corr;
 	}
 	
+	// Vlo = (Vlo*VLO_GAIN_corr) + VLO_OFFSET_corr;
+	// Vhi = (Vhi*VHI_GAIN_corr) + VHI_OFFSET_corr;
+	
+	Vforce = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) );
+	Vforce = (Vforce*VFORCE_GAIN_corr) + VFORCE_OFFSET_corr;
+	
 	/** @see Equation (3.4) */
 	Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
+	Vdut = (Vdut*VDUT_GAIN_corr) + VDUT_OFFSET_corr;
+	
 	
 	/** @see Equation (3.3) */
 	Ibias = Vlo / V_DIV_R4;
   
 	/** @see Equation (3.2) */
-	Vshunt = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) ) - Vdut;
+	// Vshunt = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) ) - Vdut;
+	Vshunt = Vforce - Vdut;
 	
 	/** @see Equation (3.1) */
 	Idut = ( Vshunt / Rs ) - Ibias;
 	
-	printf("%.5f mA, %.4f V, %.2f R, %.3f W\n", 1000.0f*Idut, Vdut, Vdut/Idut, Vdut*Idut);
-	
+#ifdef ENABLE_BSP_VALUES_PRINTF
+	printf("%.7f\t%.7f\n", Vforce, Vdut);
+	//printf("%.7f,\t%.7f\n", Vhi, Vlo);
+	//printf("%.4f mV, %.1f R\n", 1000*Vshunt, Rs);
+	//printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f*Idut, Vdut, Vdut/Idut, 1000*Vdut*Idut);
+#endif
+
 	return Idut;
 }
 
@@ -213,6 +246,11 @@ float ETA_CTGS_GetVoltageSense(float vadc)
 	// do a first order correction (offset and gain) 
 	// do a linear fit with a reference measurement
 	vadc = ( vadc * V_MEAS_GAIN_corr ) + V_MEAS_OFFSET_corr;
+	
+#ifdef ENABLE_BSP_VALUES_PRINTF
+	printf("%.4f\t", vadc);
+#endif
+	
 	return vadc;
 }
 
@@ -232,30 +270,8 @@ void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, flo
 	volt = volt / V_SOURCE_GAIN; // ideal gain
 	MAX5717_SetVoltage(dac, volt);
 	state->dacOutputVoltage = volt;
+	printf("%.2f\n", volt);
 }
-
-
-/*
-
-	float A = ((48.0f / 4.7f)/5.6f);
-	float stepsize = A/(float)DMA_BUFFER_SIZE;
-	for(uint16_t i=0; i<DMA_BUFFER_SIZE; i++){
-		volts = (i*stepsize)-(A/2.0f);
-		uint32_t code = MAX5717_VoltageToCode(&dac1, volts);
-		code = code << 4;
-		dmaDacTx[3*i]   = (uint8_t)((code >> 16) & 0xFF);
-		dmaDacTx[3*i+1] = (uint8_t)((code >>  8) & 0xFF);
-		dmaDacTx[3*i+2] = (uint8_t)((code >>  0) & 0xFF);
-		// printf("%.5f,\n", volts);
-		//printf("%d\n", code);
-	}
-
-
-
-
-
-*/
-
 
 
 

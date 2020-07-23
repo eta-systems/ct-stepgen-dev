@@ -68,6 +68,27 @@ extern volatile CurveTracer_State_t deviceState;
 /*           SCPI Command Callback Handlers                                   */ 
 /******************************************************************************/
 
+static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context)
+{
+	double param1;
+  // fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
+  /* read first parameter if present */
+  if (!SCPI_ParamDouble(context, &param1, TRUE)) {
+		return SCPI_RES_ERR;
+	}
+	
+	if( (param1 > 0.004f) && (param1 < 0.006f) ){
+		/** @bug directly changing range does not work. Will become stuck in HAL_Delay */
+		// ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
+		printf("OK\n");
+	}
+	if( (param1 > 0.006f) && (param1 < 2.6f) ){
+		/** @bug directly changing range does not work. Will become stuck in HAL_Delay  */
+		// ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
+		printf("OK\n");
+	}
+}
+
 /**
   * @brief  save and set a desired output voltage
 	*/
@@ -193,6 +214,7 @@ const scpi_command_t scpi_commands[] = {
     /* DMM */
     {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
     {.pattern = "MEASure:CURRent[:DC]?", .callback = scpi_etaCT_MeasureCurrentQ,},
+    {.pattern = "CURRent:RANGe",         .callback = scpi_etaCT_RangeCurrent,},
     /* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
 		
 		/* SOURCE */
@@ -201,8 +223,6 @@ const scpi_command_t scpi_commands[] = {
     {.pattern = "SOURce:CURRent[:LIMit]", .callback = scpi_etaCT_SetCurrent,},
     {.pattern = "SOURce:CURRent[:LIMit]?", .callback = scpi_etaCT_SetCurrentQ,},
 		
-		
-
     SCPI_CMD_LIST_END
 };
 
