@@ -139,8 +139,8 @@ void ADS125X_ADC_Code2Volt (ADS125X_t *ads, int32_t *pCode, float *pVolt, uint16
   * @see    Datasheet Fig. 30 RDATA Command Sequence
   */
 		
-/* LIBRARY MACHEN SO: */
-/* ALI NIX SCHULD: */
+/** @note not used -> reduce code size */
+/*
 float ADS125X_ADC_ReadVolt (ADS125X_t *ads){
 	uint8_t spiRx[3] = {0,0,0};
 	spiRx[0] = ADS125X_CMD_RDATA;
@@ -161,6 +161,7 @@ float ADS125X_ADC_ReadVolt (ADS125X_t *ads){
 	// do all calculations in float. don't change the order of factors --> (adsCode/0x7fffff) will always return 0
 	return ( (float)adsCode * (2.0f * ads->vref) ) / ( ads->pga * 8388607.0f );  // 0x7fffff = 8388607.0f
 }
+*/
 
 /**
   * @brief  reads from internal registers
@@ -234,10 +235,14 @@ uint8_t ADS125X_CMD_Send(ADS125X_t *ads, uint8_t cmd)
   * @param  p_chan positive analog input
   * @see    Datasheet p. 31 MUX : Input Multiplexer Control Register (Address 01h)
   */
+
+/** @note not used -> reduce code size */
+/*
 void ADS125X_Channel_Set(ADS125X_t *ads, int8_t channel)
 { 
   ADS125X_ChannelDiff_Set(ads, channel, ADS125X_MUXN_AINCOM); 
 }
+*/
 
 /**
   * @brief  set internal multiplexer to differential input channel

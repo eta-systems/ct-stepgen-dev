@@ -69,11 +69,11 @@ MAX5717_t dac1;
 ADS125X_t adcv;
 ADS125X_t adci;
 
-volatile uint8_t dmaDacTx [ 3*DMA_BUFFER_SIZE ];
-const uint16_t dmaBufferSize = DMA_BUFFER_SIZE;
+volatile uint8_t  dmaDacTx [ 3*DMA_BUFFER_SIZE ];
+const    uint16_t dmaBufferSize = DMA_BUFFER_SIZE;
 volatile uint16_t dmaPtr;
 
-extern scpi_t scpi_context;
+extern   scpi_t scpi_context;
 volatile CurveTracer_State_t deviceState;
 
 volatile uint8_t is_config_done;
@@ -201,19 +201,6 @@ int main(void)
 		
 	printf("2.476.101.01 Step Generator for Curve Tracer\n");
 	printf("(c)2020 - eta systems GmbH\n");
-	
-	printf("2.5\n");
-	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
-	HAL_Delay(1000);
-	printf("0.005\n");
-	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
-	HAL_Delay(1000);
-	printf("2.5\n");
-	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
-	HAL_Delay(1000);
-	printf("0.005\n");
-	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
-	HAL_Delay(1000);
 	
 	HAL_Delay(10);
 	ADS125X_CS(&adci, 1);  // chip select always enabled for DMA Transfer

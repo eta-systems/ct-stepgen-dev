@@ -561,8 +561,8 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi){
 						TxDMABufferOffset = 0;
 						// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
 						deviceState.adcVlo = volt2;
+						ETA_CTGS_GetCurrentSense(deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
 					}
-					ETA_CTGS_GetCurrentSense(deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
 					ads1256_state = DMA_STATE_Ready;
 					break;
 				

@@ -26,7 +26,8 @@
 /* USER CODE BEGIN PD */
 
 // #define ENABLE_BSP_DEBUG_PRINTF
-// #define ENABLE_BSP_VALUES_PRINTF
+#define ENABLE_BSP_VALUES_PRINTF
+#define ENABLE_BSP_WATCHDOG_PRINTF
 
 /* USER CODE END PD */
 
@@ -133,6 +134,7 @@ void ETA_CTGS_InitADC(void)
 	
 	TxDMABufferOffsetStep = 6;
 	TxDMABufferOffset = 0;
+	
 }
 
 /**
@@ -146,6 +148,11 @@ void ETA_CTGS_Init(CurveTracer_State_t *state)
 	// output values
 	state->dacOutputVoltage = 0.0f;
 	state->dacOutputCurrent = 0.0f;
+	// watchdog values
+	state->maxOC =  0.0051f;
+	state->minOC = -0.0051f;
+	state->maxOV =  5.100f;
+	state->minOV = -5.100f;
 	
 	state->current_range = RANGE_OFF;
 	
@@ -198,6 +205,8 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 	static float Idut;
 	static float Ibias;
 	static float Vshunt;
+	static float k12 = V_DIV_K12;
+	static float k34 = V_DIV_K34;
 	
 	if(range == RANGE_5mA){
 		Rs = RS_5 + RS_5_corr;
@@ -208,16 +217,18 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 	// Vlo = (Vlo*VLO_GAIN_corr) + VLO_OFFSET_corr;
 	// Vhi = (Vhi*VHI_GAIN_corr) + VHI_OFFSET_corr;
 	
-	Vforce = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) );
-	Vforce = (Vforce*VFORCE_GAIN_corr) + VFORCE_OFFSET_corr;
+	//Vforce = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) );
+	Vforce = (Vhi + VHI_OFFSET) * k12;
+	//Vforce = (Vforce*VFORCE_GAIN_corr) + VFORCE_OFFSET_corr;
 	
 	/** @see Equation (3.4) */
-	Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
-	Vdut = (Vdut*VDUT_GAIN_corr) + VDUT_OFFSET_corr;
-	
+	//Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
+	//Vdut = (Vdut*VDUT_GAIN_corr) + VDUT_OFFSET_corr;
+	Vdut = (Vlo + VLO_OFFSET) * k34;
 	
 	/** @see Equation (3.3) */
-	Ibias = Vlo / V_DIV_R4;
+	Ibias = (Vlo + VLO_OFFSET) / V_DIV_R4;
+	//Ibias = Vdut / (V_DIV_R4 + V_DIV_R3);
   
 	/** @see Equation (3.2) */
 	// Vshunt = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) ) - Vdut;
@@ -227,10 +238,13 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 	Idut = ( Vshunt / Rs ) - Ibias;
 	
 #ifdef ENABLE_BSP_VALUES_PRINTF
-	printf("%.7f\t%.7f\n", Vforce, Vdut);
-	//printf("%.7f,\t%.7f\n", Vhi, Vlo);
+	//printf("%.8f\t%.8f\n", Vforce, Vdut);
+	//printf("%.7f\t%.7f\n", Vhi, Vlo);
 	//printf("%.4f mV, %.1f R\n", 1000*Vshunt, Rs);
 	//printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f*Idut, Vdut, Vdut/Idut, 1000*Vdut*Idut);
+	//printf("%.5f\t%.5f\n", Vdut, 1000.0f*Idut);
+	//printf("%.7f\t%.8f\n", Vdut, Idut);
+	printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f*Idut, Vdut, Vdut/Idut, 1000*Vdut*Idut);
 #endif
 
 	return Idut;
@@ -248,7 +262,7 @@ float ETA_CTGS_GetVoltageSense(float vadc)
 	vadc = ( vadc * V_MEAS_GAIN_corr ) + V_MEAS_OFFSET_corr;
 	
 #ifdef ENABLE_BSP_VALUES_PRINTF
-	printf("%.4f\t", vadc);
+	//printf("%.4f\t", vadc);
 #endif
 	
 	return vadc;

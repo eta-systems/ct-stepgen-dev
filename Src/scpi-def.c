@@ -87,6 +87,8 @@ static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context)
 		// ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
 		printf("OK\n");
 	}
+	
+	return SCPI_RES_OK;
 }
 
 /**

@@ -50,15 +50,20 @@ extern "C" {
 #define V_DIV_R2  ( 10000.0f)
 #define V_DIV_R3  (100000.0f)
 #define V_DIV_R4  ( 10000.0f)
+#define V_DIV_K12 (11.00279608f)    /** @see Messprotokoll: IMEASCAL20200724 */
+#define V_DIV_K34 (11.01784557f)    /** @see Messprotokoll: IMEASCAL20200724 */
+#define VHI_OFFSET (0.0002209328f)  /** @see Messprotokoll: IMEASCAL20200724 */
+#define VLO_OFFSET (0.0004493834f)  /** @see Messprotokoll: IMEASCAL20200724 */
+
 #define RS_5    (200.0f)   // Sense R in Ohms
 #define RS_2500 (0.4f)     // Sense R in Ohm
-#define RS_5_corr    (0.0f)  // calibrated correction value
+#define RS_5_corr    (200.0f - 199.666f)  // calibrated correction value
 #define RS_2500_corr (0.0f)  // calibrated correction value
 
-#define VDUT_GAIN_corr     (1.001568195399f)      /** @see Messprotokoll: MEASVREF20200717 */
-#define VDUT_OFFSET_corr   (0.004727775287749f)   /** @see Messprotokoll: MEASVREF20200717 */
-#define VFORCE_GAIN_corr   (1.000184160203f)      /** @see Messprotokoll: MEASVREF20200717 */
-#define VFORCE_OFFSET_corr (0.002076113737264f)   /** @see Messprotokoll: MEASVREF20200717 */
+#define VDUT_GAIN_corr     (1.001572695227f)    /** @see Messprotokoll: MEASVREF20200717 */
+#define VDUT_OFFSET_corr   (0.004608302344475f) /** @see Messprotokoll: MEASVREF20200717 */
+#define VFORCE_GAIN_corr   (1.000187864781f)    /** @see Messprotokoll: MEASVREF20200717 */
+#define VFORCE_OFFSET_corr (0.002104415595912f) /** @see Messprotokoll: MEASVREF20200717 */
 
 /* Voltage Measurement */
 #define V_MEAS_ATTENUATION (14.000f) // from H-Attenuator
@@ -94,6 +99,11 @@ typedef struct {
 	float adcVforce;
 	float adcVdut;
 	
+	float maxOC;
+	float minOC;
+	float maxOV;
+	float minOV;
+	
 	CurrentRange_t current_range;
 } CurveTracer_State_t;
 
@@ -104,6 +114,15 @@ typedef enum {
 	DMA_STATE_Tx_RDATA,
 	DMA_STATE_Rx_ADC
 } ADS1255_DMA_State_t;
+
+typedef enum {
+	CT_OK          = 0,
+	CT_ERROR_OC    = 1,    /* over current */
+	CT_ERROR_OV    = 2,    /* over voltage */
+	CT_ERROR_HWCOM = 4,    /* hardware communication failed */
+	CT_ERROR_VALUE = 8,    /* value out of bounds error */
+	CT_ERROR_OTHER = 16
+} CT_StatusTypeDef;
 
 /* Init */
 void ETA_CTGS_InitDAC(void);
@@ -118,6 +137,8 @@ float ETA_CTGS_GetVoltageSense  (float vadc);
 /* Source (DAC) */
 void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
 void  ETA_CTGS_CurrentOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
+/* Watchdog */
+CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state);
 
 #endif	/* BSP_2_476_101_H */
 
