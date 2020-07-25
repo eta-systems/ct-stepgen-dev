@@ -2,21 +2,21 @@
  * @file        BSP.2.476.101.01.c
  * @brief       Board Support Package (BSP) for 2.476.101.01 curve tracer
  * @details     This file implements constants, math and hardware specific 
-                functionalities
+ functionalities
  * @version     1.0
  * @author      Simon Burkhardt
  * @date        2020.07.05
  * @copyright   (c) 2020 eta systems GmbH
  * @note        2.476.101.01 step generator for curve tracer
-********************************************************************************
-*/
+ ********************************************************************************
+ */
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include "main.h"
 #include "2.476.101.01.BSP.h"
-#include <arm_math.h>
+//#include <arm_math.h>
 #include <stdio.h>
 #include "max5717.h"
 #include "ads1255.h"
@@ -46,71 +46,69 @@ uint8_t TxDMABufferOffset;
 /* USER CODE END EV */
 
 /******************************************************************************/
-/*           Board Specific Hardware Functions                                */ 
+/*           Board Specific Hardware Functions                                */
 /******************************************************************************/
 
 /**
-  * @brief  initializes MAX5719 DAC
-  */
-void ETA_CTGS_InitDAC(void)
-{
-	dac1.csPort    = SPI4_CS_GPIO_Port;
-	dac1.csPin     = SPI4_CS_Pin;
+ * @brief  initializes MAX5719 DAC
+ */
+void ETA_CTGS_InitDAC(void) {
+	dac1.csPort = SPI4_CS_GPIO_Port;
+	dac1.csPin = SPI4_CS_Pin;
 	dac1.latchPort = SPI4_LATCH_GPIO_Port;
-	dac1.latchPin  = SPI4_LATCH_Pin;
+	dac1.latchPin = SPI4_LATCH_Pin;
 
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("config MAX5717...\n");
 #endif
-	
+
 	MAX5717_Init(&dac1, &hspi4, V_REF_DAC);
-	
+
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
 #endif	
 }
 
 /**
-  * @brief  initializes both ADS125x ADCs
-  */
-void ETA_CTGS_InitADC(void)
-{
+ * @brief  initializes both ADS125x ADCs
+ */
+void ETA_CTGS_InitADC(void) {
 	/* ADS1256 must be initialized first because of CLKOUT to ADS1255 */
-  HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);  // SYNC Pin is PDWN Pin --> turn on ADS125x
-	
-	adci.csPort   = SPI1_CS_GPIO_Port;
-	adci.csPin    =  SPI1_CS_Pin;
+	HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET); // SYNC Pin is PDWN Pin --> turn on ADS125x
+
+	adci.csPort = SPI1_CS_GPIO_Port;
+	adci.csPin = SPI1_CS_Pin;
 	adci.drdyPort = SPI1_DRDY_GPIO_Port;
-	adci.drdyPin  =  SPI1_DRDY_Pin;
+	adci.drdyPin = SPI1_DRDY_Pin;
 	adci.vref = V_REF_ADS1256;
 	adci.hspix = &hspi1;
-	
+
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("config ADS1256...\n");
 #endif	
-	
+
 	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
-	
+
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
 #endif	
-	
+
 	HAL_Delay(500);  // wait for clkout to start ADS1255
-	
-	adcv.csPort   = SPI3_CS_GPIO_Port;
-	adcv.csPin    =  SPI3_CS_Pin;
+
+	adcv.csPort = SPI3_CS_GPIO_Port;
+	adcv.csPin = SPI3_CS_Pin;
 	adcv.drdyPort = SPI3_DRDY_GPIO_Port;
-	adcv.drdyPin  =  SPI3_DRDY_Pin;
+	adcv.drdyPin = SPI3_DRDY_Pin;
 	adcv.vref = V_REF_ADS1255;
 	adcv.hspix = &hspi3;
-	
+
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("config ADS1255...\n");
 #endif	
 
-	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA2, 0);    // PGA=2
+	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA2, 0); // PGA=2
 	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN0, ADS125X_MUXN_AIN1);
-	
+
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
 #endif	
@@ -123,25 +121,24 @@ void ETA_CTGS_InitADC(void)
 	TxDMAchannelCycle[3] = ADS125X_CMD_SYNC;
 	TxDMAchannelCycle[4] = ADS125X_CMD_WAKEUP;
 	TxDMAchannelCycle[5] = ADS125X_CMD_RDATA;
-	
+
 	// CHANNEL 2/3
-	TxDMAchannelCycle[6]  = ADS125X_CMD_WREG | ADS125X_REG_MUX;
-	TxDMAchannelCycle[7]  = 0x00;
-	TxDMAchannelCycle[8]  = ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3;  // Vlo
-	TxDMAchannelCycle[9]  = ADS125X_CMD_SYNC;
+	TxDMAchannelCycle[6] = ADS125X_CMD_WREG | ADS125X_REG_MUX;
+	TxDMAchannelCycle[7] = 0x00;
+	TxDMAchannelCycle[8] = ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3;  // Vlo
+	TxDMAchannelCycle[9] = ADS125X_CMD_SYNC;
 	TxDMAchannelCycle[10] = ADS125X_CMD_WAKEUP;
 	TxDMAchannelCycle[11] = ADS125X_CMD_RDATA;
-	
+
 	TxDMABufferOffsetStep = 6;
 	TxDMABufferOffset = 0;
-	
+
 }
 
 /**
-  * @brief  initializes Curve Tracer State and pripherals
-  */
-void ETA_CTGS_Init(CurveTracer_State_t *state)
-{
+ * @brief  initializes Curve Tracer State and pripherals
+ */
+void ETA_CTGS_Init(CurveTracer_State_t *state) {
 	// input values
 	state->adcInputVoltage = 0.0f;
 	state->adcInputCurrent = 0.0f;
@@ -149,19 +146,18 @@ void ETA_CTGS_Init(CurveTracer_State_t *state)
 	state->dacOutputVoltage = 0.0f;
 	state->dacOutputCurrent = 0.0f;
 	// watchdog values
-	state->maxOC =  0.0051f;
+	state->maxOC = 0.0051f;
 	state->minOC = -0.0051f;
-	state->maxOV =  5.100f;
+	state->maxOV = 5.100f;
 	state->minOV = -5.100f;
-	
+
 	state->current_range = RANGE_OFF;
-	
+
 	ETA_CTGS_OutputOff();  // turn Ranging relais off
-	
+
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
 	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
-	
-	
+
 	// ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN0, ADS125X_MUXN_AINCOM);
 	ADS125X_ChannelDiff_Set(&adci, ADS125X_MUXP_AIN2, ADS125X_MUXN_AIN5);
 	ADS125X_CMD_Send(&adci, ADS125X_CMD_SYNC);
@@ -169,36 +165,35 @@ void ETA_CTGS_Init(CurveTracer_State_t *state)
 }
 
 /**
-  * @brief  turns on one of the ranging relays
-  * @param  range [RANGE_5mA, RANGE_2500mA]
-  */
-void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range){
+ * @brief  turns on one of the ranging relays
+ * @param  range [RANGE_5mA, RANGE_2500mA]
+ */
+void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range) {
 	ETA_CTGS_OutputOff();  // turn off  first!
-	if(range == RANGE_5mA){
-		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_SET);  // turn on
+	if (range == RANGE_5mA) {
+		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
-		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port,    R5mA_ON_Pin,    GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_RESET);
 	} else {
-		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_SET);  // turn on
+		HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
-		HAL_GPIO_WritePin(R25A_ON_GPIO_Port,    R25A_ON_Pin,    GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_RESET);
 	}
 }
 
 /**
-  * @brief  turns off all outut relays
-  */
-void ETA_CTGS_OutputOff(void){
+ * @brief  turns off all outut relays
+ */
+void ETA_CTGS_OutputOff(void) {
 	// turn off
-	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port,    R5mA_OFF_Pin,    GPIO_PIN_SET);
-	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port,    R25A_OFF_Pin,    GPIO_PIN_SET);
+	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_SET);
 	HAL_Delay(50);
-	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port,    R5mA_OFF_Pin,    GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port,    R25A_OFF_Pin,    GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 }
 
-float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
-{
+float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range) {
 	static float Vforce;
 	static float Vdut;
 	static float Rs;
@@ -207,36 +202,36 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 	static float Vshunt;
 	static float k12 = V_DIV_K12;
 	static float k34 = V_DIV_K34;
-	
-	if(range == RANGE_5mA){
+
+	if (range == RANGE_5mA) {
 		Rs = RS_5 + RS_5_corr;
 	} else {
 		Rs = RS_2500 + RS_2500_corr;
 	}
-	
+
 	// Vlo = (Vlo*VLO_GAIN_corr) + VLO_OFFSET_corr;
 	// Vhi = (Vhi*VHI_GAIN_corr) + VHI_OFFSET_corr;
-	
+
 	//Vforce = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) );
 	Vforce = (Vhi + VHI_OFFSET) * k12;
 	//Vforce = (Vforce*VFORCE_GAIN_corr) + VFORCE_OFFSET_corr;
-	
+
 	/** @see Equation (3.4) */
 	//Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
 	//Vdut = (Vdut*VDUT_GAIN_corr) + VDUT_OFFSET_corr;
 	Vdut = (Vlo + VLO_OFFSET) * k34;
-	
+
 	/** @see Equation (3.3) */
 	Ibias = (Vlo + VLO_OFFSET) / V_DIV_R4;
 	//Ibias = Vdut / (V_DIV_R4 + V_DIV_R3);
-  
+
 	/** @see Equation (3.2) */
 	// Vshunt = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) ) - Vdut;
 	Vshunt = Vforce - Vdut;
-	
+
 	/** @see Equation (3.1) */
-	Idut = ( Vshunt / Rs ) - Ibias;
-	
+	Idut = (Vshunt / Rs) - Ibias;
+
 #ifdef ENABLE_BSP_VALUES_PRINTF
 	//printf("%.8f\t%.8f\n", Vforce, Vdut);
 	//printf("%.7f\t%.7f\n", Vhi, Vlo);
@@ -244,38 +239,38 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range)
 	//printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f*Idut, Vdut, Vdut/Idut, 1000*Vdut*Idut);
 	//printf("%.5f\t%.5f\n", Vdut, 1000.0f*Idut);
 	//printf("%.7f\t%.8f\n", Vdut, Idut);
-	printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f*Idut, Vdut, Vdut/Idut, 1000*Vdut*Idut);
+	printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f * Idut, Vdut,
+			Vdut / Idut, 1000 * Vdut * Idut);
 #endif
 
 	return Idut;
 }
 
 /**
-  * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
-  * @param  Vadc measured ADC voltage
-  */
-float ETA_CTGS_GetVoltageSense(float vadc)
-{
+ * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
+ * @param  Vadc measured ADC voltage
+ */
+float ETA_CTGS_GetVoltageSense(float vadc) {
 	vadc = (vadc * V_MEAS_ATTENUATION);
 	// do a first order correction (offset and gain) 
 	// do a linear fit with a reference measurement
-	vadc = ( vadc * V_MEAS_GAIN_corr ) + V_MEAS_OFFSET_corr;
-	
+	vadc = (vadc * V_MEAS_GAIN_corr) + V_MEAS_OFFSET_corr;
+
 #ifdef ENABLE_BSP_VALUES_PRINTF
 	//printf("%.4f\t", vadc);
 #endif
-	
+
 	return vadc;
 }
 
 /**
-  * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
-	* @param  *state the curve tracer device state
-	* @param  *dac pointer to the DAC handle
-  * @param  volt the desired output voltage on Vforce
-  */
-void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt)
-{
+ * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
+ * @param  *state the curve tracer device state
+ * @param  *dac pointer to the DAC handle
+ * @param  volt the desired output voltage on Vforce
+ */
+void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac,
+		float volt) {
 	// calculations are in reverse
 	// input value is +/- 48V
 	// DAC output is +/- 2.048V
@@ -286,6 +281,4 @@ void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, flo
 	state->dacOutputVoltage = volt;
 	printf("%.2f\n", volt);
 }
-
-
 
