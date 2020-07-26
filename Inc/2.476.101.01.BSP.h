@@ -129,7 +129,7 @@ void ETA_CTGS_InitDAC(void);
 void ETA_CTGS_InitADC(void);
 void ETA_CTGS_Init(CurveTracer_State_t *state);
 /* Current Sense */
-void  ETA_CTGS_OutputOff        (void);
+void  ETA_CTGS_OutputOff        (CurveTracer_State_t *state);
 void  ETA_CTGS_CurrentRangeSet  (CurveTracer_State_t *state, CurrentRange_t range);
 float ETA_CTGS_GetCurrentSense  (float Vhi, float Vlo, CurrentRange_t range);
 /* Voltage Sense */

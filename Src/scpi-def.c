@@ -75,16 +75,18 @@ static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context) {
 	}
 
 	if ((param1 > 0.004f) && (param1 < 0.006f)) {
-		/** @bug directly changing range does not work. Will become stuck in HAL_Delay */
-		// ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
-		printf("OK\n");
+		ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_5mA);
 	}
 	if ((param1 > 0.006f) && (param1 < 2.6f)) {
-		/** @bug directly changing range does not work. Will become stuck in HAL_Delay  */
-		// ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
-		printf("OK\n");
+		ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_2500mA);
 	}
 
+	return SCPI_RES_OK;
+}
+
+static scpi_result_t scpi_etaCT_RangeCurrentOff(scpi_t * context) {
+	double param1;
+	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_OFF);
 	return SCPI_RES_OK;
 }
 
@@ -163,7 +165,21 @@ static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context) {
 static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context) {
 	double param1 = (double) (deviceState.adcInputVoltage);
 	//SCPI_ResultDouble(context, param1);
-	printf("%.6f\r\n", deviceState.adcInputCurrent);
+	printf("%.8f\r\n", deviceState.adcInputCurrent);
+	return SCPI_RES_OK;
+}
+
+/**
+ * @brief  read back the last measured DC current
+ */
+static scpi_result_t scpi_etaCT_RangeCurrentQ(scpi_t * context) {
+	if(deviceState.current_range == RANGE_5mA){
+		printf("0.005\r\n");
+	} else if(deviceState.current_range == RANGE_2500mA){
+		printf("2.5\r\n");
+	} else {
+		printf("OFF\r\n");
+	}
 	return SCPI_RES_OK;
 }
 
@@ -182,51 +198,45 @@ static scpi_result_t My_CoreTstQ(scpi_t * context) {
 	return SCPI_RES_OK;
 }
 
-const scpi_command_t scpi_commands[] =
-		{
-		/* IEEE Mandated Commands (SCPI std V1999.0 4.1.1) */
-		{ .pattern = "*CLS", .callback = SCPI_CoreCls, }, { .pattern = "*ESE",
-				.callback = SCPI_CoreEse, }, { .pattern = "*ESE?", .callback =
-				SCPI_CoreEseQ, }, { .pattern = "*ESR?", .callback =
-				SCPI_CoreEsrQ, }, { .pattern = "*IDN?", .callback =
-				SCPI_CoreIdnQ, },
-				{ .pattern = "*OPC", .callback = SCPI_CoreOpc, }, { .pattern =
-						"*OPC?", .callback = SCPI_CoreOpcQ, }, { .pattern =
-						"*RST", .callback = SCPI_CoreRst, }, {
-						.pattern = "*SRE", .callback = SCPI_CoreSre, }, {
-						.pattern = "*SRE?", .callback = SCPI_CoreSreQ, }, {
-						.pattern = "*STB?", .callback = SCPI_CoreStbQ, }, {
-						.pattern = "*TST?", .callback = My_CoreTstQ, }, {
-						.pattern = "*WAI", .callback = SCPI_CoreWai, },
+const scpi_command_t scpi_commands[] = {
+    /* IEEE Mandated Commands (SCPI std V1999.0 4.1.1) */
+    { .pattern = "*CLS", .callback = SCPI_CoreCls,},
+    { .pattern = "*ESE", .callback = SCPI_CoreEse,},
+    { .pattern = "*ESE?", .callback = SCPI_CoreEseQ,},
+    { .pattern = "*ESR?", .callback = SCPI_CoreEsrQ,},
+    { .pattern = "*IDN?", .callback = SCPI_CoreIdnQ,},
+    { .pattern = "*OPC", .callback = SCPI_CoreOpc,},
+    { .pattern = "*OPC?", .callback = SCPI_CoreOpcQ,},
+    { .pattern = "*RST", .callback = SCPI_CoreRst,},
+    { .pattern = "*SRE", .callback = SCPI_CoreSre,},
+    { .pattern = "*SRE?", .callback = SCPI_CoreSreQ,},
+    { .pattern = "*STB?", .callback = SCPI_CoreStbQ,},
+    { .pattern = "*TST?", .callback = My_CoreTstQ,},
+    { .pattern = "*WAI", .callback = SCPI_CoreWai,},
 
-				/* Required SCPI commands (SCPI std V1999.0 4.2.1) */
-				{ .pattern = "SYSTem:ERRor[:NEXT]?", .callback =
-						SCPI_SystemErrorNextQ, }, { .pattern =
-						"SYSTem:ERRor:COUNt?", .callback =
-						SCPI_SystemErrorCountQ, }, { .pattern =
-						"SYSTem:VERSion?", .callback = SCPI_SystemVersionQ, },
+    /* Required SCPI commands (SCPI std V1999.0 4.2.1) */
+    {.pattern = "SYSTem:ERRor[:NEXT]?", .callback = SCPI_SystemErrorNextQ,},
+    {.pattern = "SYSTem:ERRor:COUNt?",  .callback = SCPI_SystemErrorCountQ,},
+    {.pattern = "SYSTem:VERSion?",      .callback = SCPI_SystemVersionQ,},
 
-				/* {.pattern = "STATus:PRESet", .callback = SCPI_StatusPreset,}, */
+    /* {.pattern = "STATus:PRESet", .callback = SCPI_StatusPreset,}, */
 
-				/* DMM */
-				{ .pattern = "MEASure:VOLTage[:DC]?", .callback =
-						scpi_etaCT_MeasureVoltageQ, }, { .pattern =
-						"MEASure:CURRent[:DC]?", .callback =
-						scpi_etaCT_MeasureCurrentQ, }, { .pattern =
-						"CURRent:RANGe", .callback = scpi_etaCT_RangeCurrent, },
-				/* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
+    /* DMM */
+    {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
+    {.pattern = "MEASure:CURRent[:DC]?", .callback = scpi_etaCT_MeasureCurrentQ,},
+    {.pattern = "CURRent:RANGe",         .callback = scpi_etaCT_RangeCurrent,},
+    {.pattern = "CURRent:RANGe?",        .callback = scpi_etaCT_RangeCurrentQ,},
+    /* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
 
-				/* SOURCE */
-				{ .pattern = "SOURce:VOLTage[:LEVel]", .callback =
-						scpi_etaCT_SetVoltage, }, { .pattern =
-						"SOURce:VOLTage[:LEVel]?", .callback =
-						scpi_etaCT_SetVoltageQ, }, { .pattern =
-						"SOURce:CURRent[:LIMit]", .callback =
-						scpi_etaCT_SetCurrent, }, { .pattern =
-						"SOURce:CURRent[:LIMit]?", .callback =
-						scpi_etaCT_SetCurrentQ, },
+		/* SOURCE */
+    {.pattern = "SOURce:VOLTage[:LEVel]",  .callback = scpi_etaCT_SetVoltage,},
+    {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
+    {.pattern = "SOURce:CURRent[:LIMit]",  .callback = scpi_etaCT_SetCurrent,},
+    {.pattern = "SOURce:CURRent[:LIMit]?", .callback = scpi_etaCT_SetCurrentQ,},
+    {.pattern = "SOURce:OFF",              .callback = scpi_etaCT_RangeCurrentOff,},
 
-				SCPI_CMD_LIST_END };
+    SCPI_CMD_LIST_END
+};
 
 scpi_interface_t scpi_interface = { .error = SCPI_Error, .write = SCPI_Write,
 		.control = SCPI_Control, .flush = SCPI_Flush, .reset = SCPI_Reset, };

@@ -153,7 +153,7 @@ void ETA_CTGS_Init(CurveTracer_State_t *state) {
 
 	state->current_range = RANGE_OFF;
 
-	ETA_CTGS_OutputOff();  // turn Ranging relais off
+	ETA_CTGS_OutputOff(state);  // turn Ranging relais off
 
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
 	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
@@ -167,14 +167,21 @@ void ETA_CTGS_Init(CurveTracer_State_t *state) {
 /**
  * @brief  turns on one of the ranging relays
  * @param  range [RANGE_5mA, RANGE_2500mA]
+ * @note   Care must be taken when using HAL_Delay(), this function provides accurate delay (in milliseconds)
+ *         based on variable incremented in SysTick ISR. This implies that if HAL_Delay() is called from
+ *         a peripheral ISR process, then the SysTick interrupt must have higher priority (numerically lower)
+ *         than the peripheral interrupt. Otherwise the caller ISR process will be blocked.
+ *         To change the SysTick interrupt priority you have to use HAL_NVIC_SetPriority() function.
  */
 void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range) {
-	ETA_CTGS_OutputOff();  // turn off  first!
+	ETA_CTGS_OutputOff(state);  // turn off  first!
 	if (range == RANGE_5mA) {
+		state->current_range = range;
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_RESET);
 	} else {
+		state->current_range = range;
 		HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
 		HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_RESET);
@@ -183,8 +190,14 @@ void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range) 
 
 /**
  * @brief  turns off all outut relays
+ * @note   Care must be taken when using HAL_Delay(), this function provides accurate delay (in milliseconds)
+ *         based on variable incremented in SysTick ISR. This implies that if HAL_Delay() is called from
+ *         a peripheral ISR process, then the SysTick interrupt must have higher priority (numerically lower)
+ *         than the peripheral interrupt. Otherwise the caller ISR process will be blocked.
+ *         To change the SysTick interrupt priority you have to use HAL_NVIC_SetPriority() function.
  */
-void ETA_CTGS_OutputOff(void) {
+void ETA_CTGS_OutputOff(CurveTracer_State_t *state) {
+	state->current_range = RANGE_OFF;
 	// turn off
 	HAL_GPIO_WritePin(R5mA_OFF_GPIO_Port, R5mA_OFF_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_SET);
@@ -281,4 +294,74 @@ void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac,
 	state->dacOutputVoltage = volt;
 	printf("%.2f\n", volt);
 }
+
+/**
+  * @brief  Watchdog Function dealing with Over Current / Over Voltage protection
+  * @param  *state the curve tracer device state
+  */
+CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state)
+{
+	CT_StatusTypeDef status = CT_OK;
+
+	/* Voltages */
+	if((state->adcVhi > 6.0f) || (state->adcVhi < -6.0f))
+		status |= CT_ERROR_VALUE;
+	if((state->adcVlo > 6.0f) || (state->adcVlo < -6.0f))
+		status |= CT_ERROR_VALUE;
+
+	/*
+	if((state->adcVdut > V_SOURCE_POS_MAX) || (state->adcVdut < V_SOURCE_NEG_MAX)){
+		status |= CT_ERROR_VALUE;
+	}
+	if((state->adcVforce > V_SOURCE_POS_MAX) || (state->adcVforce < V_SOURCE_NEG_MAX)){
+		status |= CT_ERROR_VALUE;
+	}
+	if((state->adcInputVoltage > V_SOURCE_POS_MAX) || (state->adcInputVoltage < V_SOURCE_NEG_MAX)){
+		status |= CT_ERROR_VALUE;
+	}
+	if((state->dacOutputVoltage > V_SOURCE_POS_MAX) || (state->dacOutputVoltage < V_SOURCE_NEG_MAX))
+		status |= CT_ERROR_VALUE;
+	*/
+
+	// voltage accross sense resistor
+	if( fabsf(state->adcVdut - state->adcVforce) > 1.5f ){
+		status |= CT_ERROR_OC;
+		status |= CT_ERROR_VALUE;
+#ifdef ENABLE_BSP_WATCHDOG_PRINTF
+		printf("[wdg] Vsense > 1.5V\n");
+#endif
+	}
+
+	if( (state->adcInputVoltage > state->maxOV) || (state->adcInputVoltage < state->minOV) ){
+		status |= CT_ERROR_OV;
+	}
+
+	if(state->current_range != RANGE_OFF){
+		if( (state->adcInputCurrent > state->maxOC) || (state->adcInputCurrent < state->minOC) ){
+			status |= CT_ERROR_OC;
+		}
+	}
+
+	/* Handle Errors */
+	if(status | CT_ERROR_OC){
+		// turn off
+		ETA_CTGS_OutputOff(state);
+		ETA_CTGS_VoltageOutputSet(state, &dac1, 0.0f);
+#ifdef ENABLE_BSP_WATCHDOG_PRINTF
+		printf("[wdg] OC\n");
+#endif
+	}
+
+	if(status | CT_ERROR_OV){
+		// turn off
+		ETA_CTGS_OutputOff(state);
+		ETA_CTGS_VoltageOutputSet(state, &dac1, 0.0f);
+#ifdef ENABLE_BSP_WATCHDOG_PRINTF
+		printf("[wdg] OV\n");
+#endif
+	}
+
+	return status;
+}
+
 
