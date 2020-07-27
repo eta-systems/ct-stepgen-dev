@@ -59,6 +59,7 @@
 /* USER CODE BEGIN 0 */
 char rx;
 ADS1255_DMA_State_t ads1256_state = DMA_STATE_Ready;
+ADS1255_DMA_State_t ads1255_state = DMA_STATE_Ready;
 int32_t adsCode;
 /* USER CODE END 0 */
 
@@ -267,8 +268,7 @@ void EXTI9_5_IRQHandler(void)
 				for (uint16_t i = 0; i < 0xff; i++)
 					__NOP();
 				/** Send first 4 bytes for the MUX register */
-				HAL_SPI_Transmit_DMA(adci.hspix,
-						(uint8_t*) &TxDMAchannelCycle[0 + TxDMABufferOffset], 4); // MUX
+				HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*) &TxDMAchannelCycle[0 + TxDMABufferOffset], 4); // MUX
 				break;
 			default:
 				break;
@@ -279,42 +279,20 @@ void EXTI9_5_IRQHandler(void)
 	if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
 		/** @note DRDY for voltage ADC
 		 */
-		static int32_t pCode;
-		static float pVolt;
-		static uint8_t spiTmp[3];
+		static uint8_t spiTmp;
 
-		// only execute IRQ if ADC and all peripherals have been initialized
 		if (is_config_done) {
-			spiTmp[0] = ADS125X_CMD_RDATA;    // request Data read
-
-			ADS125X_CS(&adcv, 1);   // Chip Select
-			HAL_SPI_Transmit(adcv.hspix, spiTmp, 1, 1);
-			for (uint16_t i = 0; i < 128; i++);
-			// delay
-			HAL_SPI_Receive(adcv.hspix, spiTmp, 3, 1);
-			ADS125X_CS(&adcv, 0);   // Chip Un-Select
-
-			// Convert to float voltage
-			// must be signed integer for 2's complement to work
-			// printf("%#08x\n", pCode);
-			pCode = (spiTmp[0] << 16) | (spiTmp[1] << 8) | (spiTmp[2]);
-			if (pCode & 0x800000)
-				pCode |= 0xff000000;  // fix 2's complement
-			ADS125X_ADC_Code2Volt(&adcv, &pCode, &pVolt, 1);
-			pVolt *= 2.0f; /** @todo voltage is wrong by a factor of 2 - why? */
-			// printf("%.4f\t", pVolt);
-			pVolt = ETA_CTGS_GetVoltageSense(pVolt);
-
-			deviceState.adcInputVoltage = pVolt; // save to device state
-			printf("%.2f\n", pVolt);
-			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-
-			/* SYNC with Current Sense ADC */
-
-			HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_RESET);
-			for (uint16_t i = 0; i < 0xffff; i++) __NOP();
-			HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
-
+			switch (ads1256_state) {
+			case DMA_STATE_Ready:
+				spiTmp = ADS125X_CMD_RDATA;    // request Data read
+				ADS125X_CS(&adcv, 1);   // Chip Select
+				HAL_SPI_Transmit_DMA(adcv.hspix, &spiTmp, 1);
+				ads1255_state = DMA_STATE_Tx_RDATA;
+				break;
+			default:
+				break;
+				ads1256_state = DMA_STATE_Ready;
+			}
 		}
 		ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*)&deviceState, &dac1, deviceState.dacOutputVoltage);
 
@@ -511,6 +489,37 @@ void SPI4_IRQHandler(void)
  * @brief SPI DMA Transmit Complete Interrupt
  */
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+	/** @note Part 2/2 of SPI DMA Transfer State Machine
+	 * for VOLTAGE Sense ADC */
+	if(hspi == adcv.hspix){
+		if (is_config_done) {
+			static uint8_t dmaRx1[3];
+			static float volt1;
+			static int32_t adsCode1;
+
+			switch(ads1255_state){
+			case DMA_STATE_Tx_RDATA:
+				HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+				HAL_SPI_Receive_DMA(adcv.hspix, (uint8_t*) &dmaRx1[0], 3); // RDATA
+				adsCode1 = (dmaRx1[0] << 16) | (dmaRx1[1] << 8) | (dmaRx1[2]);
+				if (adsCode1 & 0x800000)
+					adsCode1 |= 0xff000000;  // fix 2's complement
+				ADS125X_ADC_Code2Volt(&adcv, &adsCode1, &volt1, 1);
+				volt1 *= 2.0f;
+				/** @bug voltage is wrong by a factor of 2 - why? */
+				// printf("%.4f\t", pVolt);
+				volt1 = ETA_CTGS_GetVoltageSense(volt1);
+				deviceState.adcInputVoltage = volt1; // save to device state
+				ads1255_state = DMA_STATE_Ready;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	/** @note Part 2/2 of SPI DMA Transfer State Machine
+	 * for CURRENT Sense ADC */
 	if (hspi == adci.hspix) {
 		if (is_config_done) {
 			static uint8_t dmaRx[3];
@@ -548,6 +557,9 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 						/ (adci.pga * 8388607.0f);  // 0x7fffff = 8388607.0f
 
 				/** @todo Vhi and Vlo are swapped for some reason ?? */
+				/** @bug the ReceiveDMA should have a seperate state.
+				 * here the ReceiveDMA is called while the old samples are processed afterwards */
+
 				// shift buffer offset for other MUX bytes
 				if (TxDMABufferOffset == 0) {
 					TxDMABufferOffset = TxDMABufferOffsetStep;
