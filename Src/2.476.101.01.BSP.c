@@ -17,6 +17,7 @@
 #include "main.h"
 #include "2.476.101.01.BSP.h"
 //#include <arm_math.h>
+#include <math.h>
 #include <stdio.h>
 #include "max5717.h"
 #include "ads1255.h"
@@ -26,7 +27,7 @@
 /* USER CODE BEGIN PD */
 
 // #define ENABLE_BSP_DEBUG_PRINTF
-#define ENABLE_BSP_VALUES_PRINTF
+//#define ENABLE_BSP_VALUES_PRINTF
 #define ENABLE_BSP_WATCHDOG_PRINTF
 
 /* USER CODE END PD */
@@ -87,7 +88,7 @@ void ETA_CTGS_InitADC(void) {
 	printf("config ADS1256...\n");
 #endif	
 
-	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_2_5SPS, ADS125X_PGA1, 0);
+	ADS125X_Init(&adci, &hspi1, ADS125X_DRATE_100SPS, ADS125X_PGA1, 0);
 
 #ifdef ENABLE_BSP_DEBUG_PRINTF
 	printf("done\n");
@@ -106,7 +107,7 @@ void ETA_CTGS_InitADC(void) {
 	printf("config ADS1255...\n");
 #endif	
 
-	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_2_5SPS, ADS125X_PGA2, 0); // PGA=2
+	ADS125X_Init(&adcv, &hspi3, ADS125X_DRATE_50SPS, ADS125X_PGA2, 0); // PGA=2
 	ADS125X_ChannelDiff_Set(&adcv, ADS125X_MUXP_AIN0, ADS125X_MUXN_AIN1);
 
 #ifdef ENABLE_BSP_DEBUG_PRINTF
@@ -155,6 +156,7 @@ void ETA_CTGS_Init(CurveTracer_State_t *state) {
 
 	ETA_CTGS_OutputOff(state);  // turn Ranging relais off
 
+	HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET); // chip select
 	HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // chip select
 
@@ -282,17 +284,16 @@ float ETA_CTGS_GetVoltageSense(float vadc) {
  * @param  *dac pointer to the DAC handle
  * @param  volt the desired output voltage on Vforce
  */
-void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac,
-		float volt) {
+void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac, float volt) {
 	// calculations are in reverse
 	// input value is +/- 48V
 	// DAC output is +/- 2.048V
 	// so divide by the gain, subtract offset...
+	state->dacOutputVoltage = volt;
 	volt = (volt - V_SOURCE_OFFSET_corr) / V_SOURCE_GAIN_corr;
 	volt = volt / V_SOURCE_GAIN; // ideal gain
 	MAX5717_SetVoltage(dac, volt);
-	state->dacOutputVoltage = volt;
-	printf("%.2f\n", volt);
+	// printf("%.2f\n", volt);
 }
 
 /**

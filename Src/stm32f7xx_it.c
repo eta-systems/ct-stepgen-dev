@@ -268,8 +268,7 @@ void EXTI9_5_IRQHandler(void)
 					__NOP();
 				/** Send first 4 bytes for the MUX register */
 				HAL_SPI_Transmit_DMA(adci.hspix,
-						(uint8_t*) &TxDMAchannelCycle[0 + TxDMABufferOffset],
-						4); // MUX
+						(uint8_t*) &TxDMAchannelCycle[0 + TxDMABufferOffset], 4); // MUX
 				break;
 			default:
 				break;
@@ -290,14 +289,14 @@ void EXTI9_5_IRQHandler(void)
 
 			ADS125X_CS(&adcv, 1);   // Chip Select
 			HAL_SPI_Transmit(adcv.hspix, spiTmp, 1, 1);
-			for (uint16_t i = 0; i < 0xfff; i++)
-				__NOP();
+			for (uint16_t i = 0; i < 128; i++);
 			// delay
 			HAL_SPI_Receive(adcv.hspix, spiTmp, 3, 1);
 			ADS125X_CS(&adcv, 0);   // Chip Un-Select
 
 			// Convert to float voltage
 			// must be signed integer for 2's complement to work
+			// printf("%#08x\n", pCode);
 			pCode = (spiTmp[0] << 16) | (spiTmp[1] << 8) | (spiTmp[2]);
 			if (pCode & 0x800000)
 				pCode |= 0xff000000;  // fix 2's complement
@@ -307,8 +306,18 @@ void EXTI9_5_IRQHandler(void)
 			pVolt = ETA_CTGS_GetVoltageSense(pVolt);
 
 			deviceState.adcInputVoltage = pVolt; // save to device state
-			//printf("%.4f\n", pVolt);
+			printf("%.2f\n", pVolt);
+			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
+			/* SYNC with Current Sense ADC */
+
+			HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_RESET);
+			for (uint16_t i = 0; i < 0xffff; i++) __NOP();
+			HAL_GPIO_WritePin(SPI1_SYNC_GPIO_Port, SPI1_SYNC_Pin, GPIO_PIN_SET);
+
 		}
+		ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*)&deviceState, &dac1, deviceState.dacOutputVoltage);
+
 	}
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
@@ -440,14 +449,12 @@ void DMA2_Stream1_IRQHandler(void)
 	 * this interrupt handler is executed on DMA Tx Complete
 	 * here the CS pin and the LATCH pin need to be toggled
 	 */
-	for (uint16_t i = 0; i < 0x1fff; i++)
-		;  // delay
+	for (uint16_t i = 0; i < 0x1fff; i++);  // delay
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_SET);
 
 	// latch sample to DAC output
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_RESET);
-	for (uint16_t i = 0; i < 128; i++)
-		;    // delay
+	for (uint16_t i = 0; i < 128; i++);    // delay
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_SET);
 
   /* USER CODE END DMA2_Stream1_IRQn 0 */
@@ -525,15 +532,12 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 				for (uint16_t i = 0; i < 0xff; i++)
 					;
 				/** send Request for Data Read */
-				HAL_SPI_Transmit_DMA(adci.hspix,
-						(uint8_t*) &TxDMAchannelCycle[5 + TxDMABufferOffset],
-						1); // RDATA
+				HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*) &TxDMAchannelCycle[5 + TxDMABufferOffset], 1); // RDATA
 				break;
 
 			case DMA_STATE_Tx_RDATA:
 				ads1256_state = DMA_STATE_Rx_ADC;
-				for (uint16_t i = 0; i < 128; i++)
-					;
+				for (uint16_t i = 0; i < 128; i++);
 				/** Receive 3 bytes */
 				HAL_SPI_Receive_DMA(adci.hspix, (uint8_t*) &dmaRx[0], 3); // RDATA
 
@@ -557,6 +561,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 							deviceState.adcVlo, RANGE_5mA);
 				}
 				ads1256_state = DMA_STATE_Ready;
+				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 				break;
 
 			case DMA_STATE_Rx_ADC:

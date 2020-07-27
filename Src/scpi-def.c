@@ -85,7 +85,7 @@ static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context) {
 }
 
 static scpi_result_t scpi_etaCT_RangeCurrentOff(scpi_t * context) {
-	double param1;
+	//double param1;
 	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_OFF);
 	return SCPI_RES_OK;
 }
@@ -106,8 +106,8 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context) {
 		return SCPI_RES_ERR;
 	}
 
-	ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*) &deviceState, &dac1,
-			(float) (param1));
+	ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*) &deviceState, &dac1, (float) (param1));
+	//printf("OK\r\n");
 
 	return SCPI_RES_OK;
 }
@@ -153,7 +153,7 @@ static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context) {
  * @brief  read back the last measured DC voltage
  */
 static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context) {
-	double param1 = (double) (deviceState.adcInputVoltage);
+	//double param1 = (double) (deviceState.adcInputVoltage);
 	//SCPI_ResultDouble(context, param1);
 	printf("%.8f\r\n", deviceState.adcInputVoltage);
 	return SCPI_RES_OK;
@@ -163,7 +163,7 @@ static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context) {
  * @brief  read back the last measured DC current
  */
 static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context) {
-	double param1 = (double) (deviceState.adcInputVoltage);
+	//double param1 = (double) (deviceState.adcInputVoltage);
 	//SCPI_ResultDouble(context, param1);
 	printf("%.8f\r\n", deviceState.adcInputCurrent);
 	return SCPI_RES_OK;

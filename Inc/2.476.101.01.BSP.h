@@ -38,6 +38,12 @@ extern "C" {
 #endif
 
 #include "max5717.h"
+#include "ads1255.h"
+
+/* SETTINGS */
+// current ADC measures two voltages --> real sampling rate is only half this setting
+#define SAMPLINGRATE_CURRENT (ADS125X_DRATE_100SPS)
+#define SAMPLINGRATE_VOLTAGE (ADS125X_DRATE_50SPS)
 
 /* Voltage References */
 #define V_REF_LM4140  (2.4985f)  /** @see Messprotokoll: MEASVREF20200717 */

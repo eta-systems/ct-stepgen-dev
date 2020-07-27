@@ -132,8 +132,7 @@ void ADS125X_ADC_Code2Volt(ADS125X_t *ads, int32_t *pCode, float *pVolt,
 		if (pCode[i] & 0x800000)
 			pCode[i] |= 0xff000000;  // fix 2's complement
 		// do all calculations in float. don't change the order of factors --> (adsCode/0x7fffff) will always return 0
-		pVolt[i] = ((float) pCode[i] * (2.0f * ads->vref))
-				/ (ads->pga * 8388607.0f);  // 0x7fffff = 8388607.0f
+		pVolt[i] = ((float) pCode[i] * (2.0f * ads->vref)) / (ads->pga * 8388607.0f);  // 0x7fffff = 8388607.0f
 	}
 }
 
