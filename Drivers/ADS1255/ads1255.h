@@ -206,7 +206,7 @@ float    ADS125X_ADC_ReadVolt    (ADS125X_t *ads);
 
 void     ADS125X_Channel_Set     (ADS125X_t *ads, int8_t chan);
 uint8_t  ADS125X_ChannelDiff_Set (ADS125X_t *ads, int8_t p_chan, int8_t n_chan);
-// float    ADS125X_Read_Channel    (ADS125X_t *ads );
+float    ADS125X_Read_Channel    (ADS125X_t *ads );
 
 uint8_t  ADS125X_Delay_Cycles    (ADS125X_t *ads, uint32_t cycles);
 uint32_t ADS125X_read_uint24     (ADS125X_t *ads );

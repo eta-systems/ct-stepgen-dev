@@ -45,6 +45,8 @@ extern "C" {
 #define SAMPLINGRATE_CURRENT (ADS125X_DRATE_100SPS)
 #define SAMPLINGRATE_VOLTAGE (ADS125X_DRATE_50SPS)
 
+#define CONTROL_SYSTEM_GAIN (0.5f)
+
 /* Voltage References */
 #define V_REF_LM4140  (2.4985f)  /** @see Messprotokoll: MEASVREF20200717 */
 #define V_REF_ADS1255 (2.4923f)  /** @see Messprotokoll: MEASVREF20200717 */
@@ -84,8 +86,10 @@ extern "C" {
 
 #define V_SOURCE_POS_MAX ( 48.0f)
 #define V_SOURCE_NEG_MAX (-48.0f)
-#define I_SOURCE_POS_MAX ( 2.5f)
-#define I_SOURCE_NEG_MAX (-2.5f)
+#define I_SOURCE_POS_MAX_2500 ( 2.5f)
+#define I_SOURCE_NEG_MAX_2500 (-2.5f)
+#define I_SOURCE_POS_MAX_5 ( 0.01f)
+#define I_SOURCE_NEG_MAX_5 (-0.01f)
 
 /* Current Ranging */
 typedef enum { 
@@ -96,6 +100,7 @@ typedef enum {
 
 /* Instrument State / Status */
 typedef struct {
+	float desiredVoltage;
 	float dacOutputVoltage;
 	float dacOutputCurrent;
 	float adcInputVoltage;
@@ -137,12 +142,13 @@ void ETA_CTGS_Init(CurveTracer_State_t *state);
 /* Current Sense */
 void  ETA_CTGS_OutputOff        (CurveTracer_State_t *state);
 void  ETA_CTGS_CurrentRangeSet  (CurveTracer_State_t *state, CurrentRange_t range);
-float ETA_CTGS_GetCurrentSense  (float Vhi, float Vlo, CurrentRange_t range);
+float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo, CurrentRange_t range);
 /* Voltage Sense */
 float ETA_CTGS_GetVoltageSense  (float vadc);
 /* Source (DAC) */
 void  ETA_CTGS_VoltageOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
 void  ETA_CTGS_CurrentOutputSet (CurveTracer_State_t *state, MAX5717_t *dac, float volt);
+void ETA_CTGS_ControllAlgorithm (CurveTracer_State_t *state);
 /* Watchdog */
 CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state);
 

@@ -58,7 +58,7 @@
 
 /* External variables --------------------------------------------------------*/
 /* USER CODE BEGIN EV */
-extern MAX5717_t dac1;
+// extern MAX5717_t dac1;
 extern volatile CurveTracer_State_t deviceState;
 /* USER CODE END EV */
 
@@ -66,9 +66,12 @@ extern volatile CurveTracer_State_t deviceState;
 /*           SCPI Command Callback Handlers                                   */
 /******************************************************************************/
 
-static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context) {
+/**
+ * @brief sets the Current Sensing Output Range
+ */
+static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context)
+{
 	double param1;
-	// fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
 	/* read first parameter if present */
 	if (!SCPI_ParamDouble(context, &param1, TRUE)) {
 		return SCPI_RES_ERR;
@@ -84,8 +87,11 @@ static scpi_result_t scpi_etaCT_RangeCurrent(scpi_t * context) {
 	return SCPI_RES_OK;
 }
 
-static scpi_result_t scpi_etaCT_RangeCurrentOff(scpi_t * context) {
-	//double param1;
+/**
+ * @brief switches off the Output completely
+ */
+static scpi_result_t scpi_etaCT_RangeCurrentOff(scpi_t * context)
+{
 	ETA_CTGS_CurrentRangeSet( (CurveTracer_State_t*)&deviceState, RANGE_OFF);
 	return SCPI_RES_OK;
 }
@@ -93,9 +99,9 @@ static scpi_result_t scpi_etaCT_RangeCurrentOff(scpi_t * context) {
 /**
  * @brief  save and set a desired output voltage
  */
-static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context) {
+static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
+{
 	double param1;
-	// fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
 	/* read first parameter if present */
 	if (!SCPI_ParamDouble(context, &param1, TRUE)) {
 		return SCPI_RES_ERR;
@@ -104,10 +110,15 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context) {
 	/* input boundry check */
 	if ((param1 > V_SOURCE_POS_MAX) || (param1 < V_SOURCE_NEG_MAX)) {
 		return SCPI_RES_ERR;
+		// else: ignore and don't change the output
 	}
 
-	ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*) &deviceState, &dac1, (float) (param1));
-	//printf("OK\r\n");
+	deviceState.desiredVoltage = (float) (param1);
+
+	/** @important Do not directly set the voltage.
+	 * the control system is taking care of this !!
+	 */
+	// ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*) &deviceState, &dac1, (float) (param1));
 
 	return SCPI_RES_OK;
 }
@@ -115,26 +126,43 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context) {
 /**
  * @brief  read back the stored voltage
  */
-static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context) {
+static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
+{
 	double param1 = (double) (deviceState.dacOutputVoltage);
-	//SCPI_ResultDouble(context, param1);
-	printf("%.4f\r\n", param1);
+	// SCPI_ResultDouble(context, param1); // is this the way to do it ??
+	printf("%.4f\r\n", param1);  // 100V / 20 Bit = 100uV resolution --> .4f
 	return SCPI_RES_OK;
 }
 
 /**
- * @brief  save and set a desired output current
+ * @brief  save and set a desired output current (max current for OCP)
  */
-static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context) {
+static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context)
+{
 	double param1;
-	// fprintf(stderr, "conf:volt:dc\r\n"); /* debug command name */
 	/* read first parameter if present */
 	if (!SCPI_ParamDouble(context, &param1, TRUE)) {
 		return SCPI_RES_ERR;
 	}
+	/* input boundry check */
+	if(deviceState.current_range == RANGE_5mA){
+		if( (param1 > I_SOURCE_POS_MAX_5 ) || (param1 < I_SOURCE_NEG_MAX_5) )
+			return SCPI_RES_ERR;
+			// else: ignore and don't change the output
+	} else if (deviceState.current_range == RANGE_2500mA){
+		if( (param1 > I_SOURCE_POS_MAX_2500 ) || (param1 < I_SOURCE_NEG_MAX_2500) )
+			return SCPI_RES_ERR;
+			// else: ignore and don't change the output
+	}
+	if(param1 < 0.0f){
+		return SCPI_RES_ERR;
+	}
 
-	// dacOutputVoltage = (float)(param1);
-	//ETA_CTGS_VoltageOutputSet(&dac1, dacOutputVoltage );
+	/** @important Do not directly set the voltage.
+	 * the control system is taking care of this !!
+	 */
+	deviceState.maxOC = (float) ( param1);
+	deviceState.minOC = (float) (-param1);
 
 	return SCPI_RES_OK;
 }
@@ -142,37 +170,43 @@ static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context) {
 /**
  * @brief  read back the stored current
  */
-static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context) {
-	double param1 = (double) (deviceState.dacOutputCurrent);
+static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context)
+{
+	double param1 = (double) (deviceState.maxOC);
 	//SCPI_ResultDouble(context, param1);
-	printf("%.4f\r\n", param1);
+	printf("%.6f\r\n", param1);
 	return SCPI_RES_OK;
 }
 
 /**
  * @brief  read back the last measured DC voltage
  */
-static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context) {
-	//double param1 = (double) (deviceState.adcInputVoltage);
+static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context)
+{
 	//SCPI_ResultDouble(context, param1);
-	printf("%.8f\r\n", deviceState.adcInputVoltage);
+	printf("%.5f\r\n", deviceState.adcInputVoltage);  // 100V / 24 Bit = 6uV ~ 10uV --> .5f
 	return SCPI_RES_OK;
 }
 
 /**
  * @brief  read back the last measured DC current
  */
-static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context) {
-	//double param1 = (double) (deviceState.adcInputVoltage);
+static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context)
+{
 	//SCPI_ResultDouble(context, param1);
-	printf("%.8f\r\n", deviceState.adcInputCurrent);
+	if(deviceState.current_range == RANGE_2500mA){
+		printf("%.7f\r\n", deviceState.adcInputCurrent);  // LSB = 2.5uA --> .7f
+	} else if (deviceState.current_range == RANGE_5mA) {
+		printf("%.8f\r\n", deviceState.adcInputCurrent);  // LSB = 50nA  --> .8f
+	}
 	return SCPI_RES_OK;
 }
 
 /**
- * @brief  read back the last measured DC current
+ * @brief  read back the present current range setting of the relais
  */
-static scpi_result_t scpi_etaCT_RangeCurrentQ(scpi_t * context) {
+static scpi_result_t scpi_etaCT_RangeCurrentQ(scpi_t * context)
+{
 	if(deviceState.current_range == RANGE_5mA){
 		printf("0.005\r\n");
 	} else if(deviceState.current_range == RANGE_2500mA){
@@ -198,6 +232,10 @@ static scpi_result_t My_CoreTstQ(scpi_t * context) {
 	return SCPI_RES_OK;
 }
 
+/******************************************************************************/
+/*           SCPI Command Table Initialization                                */
+/******************************************************************************/
+
 const scpi_command_t scpi_commands[] = {
     /* IEEE Mandated Commands (SCPI std V1999.0 4.1.1) */
     { .pattern = "*CLS", .callback = SCPI_CoreCls,},
@@ -219,8 +257,6 @@ const scpi_command_t scpi_commands[] = {
     {.pattern = "SYSTem:ERRor:COUNt?",  .callback = SCPI_SystemErrorCountQ,},
     {.pattern = "SYSTem:VERSion?",      .callback = SCPI_SystemVersionQ,},
 
-    /* {.pattern = "STATus:PRESet", .callback = SCPI_StatusPreset,}, */
-
     /* DMM */
     {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
     {.pattern = "MEASure:CURRent[:DC]?", .callback = scpi_etaCT_MeasureCurrentQ,},
@@ -228,7 +264,7 @@ const scpi_command_t scpi_commands[] = {
     {.pattern = "CURRent:RANGe?",        .callback = scpi_etaCT_RangeCurrentQ,},
     /* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
 
-		/* SOURCE */
+	/* SOURCE */
     {.pattern = "SOURce:VOLTage[:LEVel]",  .callback = scpi_etaCT_SetVoltage,},
     {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
     {.pattern = "SOURce:CURRent[:LIMit]",  .callback = scpi_etaCT_SetCurrent,},

@@ -36,7 +36,7 @@
 #include <stdint.h>
 #include "ads1255.h"
 
-#define DEBUG_ADS1255
+// #define DEBUG_ADS1255
 
 #ifdef DEBUG_ADS1255
 #include <stdio.h>
@@ -61,8 +61,8 @@ uint8_t ADS125X_Init(ADS125X_t *ads, SPI_HandleTypeDef *hspi, uint8_t drate,
 	HAL_Delay(5);
 	ADS125X_CMD_Send(ads, ADS125X_CMD_SDATAC);
 
-	uint8_t tmp[5]; // buffer
 #ifdef DEBUG_ADS1255
+	uint8_t tmp[5]; // buffer
 	ADS125X_Register_Read(ads, ADS125X_REG_STATUS, tmp, 1);
 	printf("STATUS: %#.2x\n", tmp[0]);
 #endif
@@ -142,30 +142,29 @@ void ADS125X_ADC_Code2Volt(ADS125X_t *ads, int32_t *pCode, float *pVolt,
  * @return <float> voltage value on analog input
  * @see    Datasheet Fig. 30 RDATA Command Sequence
  */
+float ADS125X_ADC_ReadVolt(ADS125X_t *ads)
+{
+	uint8_t spiRx[3] = { 0, 0, 0 };
+	spiRx[0] = ADS125X_CMD_RDATA;
 
-/** @note not used -> reduce code size */
-/*
- float ADS125X_ADC_ReadVolt (ADS125X_t *ads){
- uint8_t spiRx[3] = {0,0,0};
- spiRx[0] = ADS125X_CMD_RDATA;
- 
- ADS125X_CS(ads, 1);
- HAL_SPI_Transmit(ads->hspix, spiRx, 1, 10);
- HAL_Delay(1);
- HAL_SPI_Receive(ads->hspix, spiRx, 3, 10);
- ADS125X_CS(ads, 0);
- 
- #ifdef DEBUG_ADS1255
- printf("RDATA: %#.2x%.2x%.2x\n", spiRx[0], spiRx[1], spiRx[2]);
- #endif
- 
- // must be signed integer for 2's complement to work
- int32_t adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
- if(adsCode & 0x800000) adsCode |= 0xff000000;  // fix 2's complement
- // do all calculations in float. don't change the order of factors --> (adsCode/0x7fffff) will always return 0
- return ( (float)adsCode * (2.0f * ads->vref) ) / ( ads->pga * 8388607.0f );  // 0x7fffff = 8388607.0f
- }
- */
+	ADS125X_CS(ads, 1);
+	HAL_SPI_Transmit(ads->hspix, spiRx, 1, 10);
+	HAL_Delay(1);
+	HAL_SPI_Receive(ads->hspix, spiRx, 3, 10);
+	ADS125X_CS(ads, 0);
+
+#ifdef DEBUG_ADS1255
+	printf("RDATA: %#.2x%.2x%.2x\n", spiRx[0], spiRx[1], spiRx[2]);
+#endif
+
+	// must be signed integer for 2's complement to work
+	int32_t adsCode = (spiRx[0] << 16) | (spiRx[1] << 8) | (spiRx[2]);
+	if (adsCode & 0x800000)
+		adsCode |= 0xff000000;  // fix 2's complement
+	// do all calculations in float. don't change the order of factors --> (adsCode/0x7fffff) will always return 0
+	return ((float) adsCode * (2.0f * ads->vref)) / (ads->pga * 8388607.0f); // 0x7fffff = 8388607.0f
+}
+
 
 /**
  * @brief  reads from internal registers
@@ -176,8 +175,8 @@ void ADS125X_ADC_Code2Volt(ADS125X_t *ads, int32_t *pCode, float *pVolt,
  * @return 
  * @see    Datasheet Fig. 34 RREG Command Example
  */
-uint8_t ADS125X_Register_Read(ADS125X_t *ads, uint8_t reg, uint8_t* pData,
-		uint8_t n) {
+uint8_t ADS125X_Register_Read(ADS125X_t *ads, uint8_t reg, uint8_t* pData, uint8_t n)
+{
 	uint8_t spiTx[2];
 	spiTx[0] = ADS125X_CMD_RREG | reg; // 1st command byte
 	spiTx[1] = n - 1;                  // 2nd command byte = bytes to be read -1
@@ -200,7 +199,8 @@ uint8_t ADS125X_Register_Read(ADS125X_t *ads, uint8_t reg, uint8_t* pData,
  * @return 
  * @see    Datasheet Fig. 35 WREG Command Example
  */
-uint8_t ADS125X_Register_Write(ADS125X_t *ads, uint8_t reg, uint8_t data) {
+uint8_t ADS125X_Register_Write(ADS125X_t *ads, uint8_t reg, uint8_t data)
+{
 	uint8_t spiTx[3];
 	spiTx[0] = ADS125X_CMD_WREG | reg; // 1st command byte
 	spiTx[1] = 0;          // 2nd command byte = payload length = 1 bytes -1 = 0
@@ -221,7 +221,8 @@ uint8_t ADS125X_Register_Write(ADS125X_t *ads, uint8_t reg, uint8_t data) {
  * @return 
  * @see    Datasheet Fig. 33 SDATAC Command Sequence
  */
-uint8_t ADS125X_CMD_Send(ADS125X_t *ads, uint8_t cmd) {
+uint8_t ADS125X_CMD_Send(ADS125X_t *ads, uint8_t cmd)
+{
 	uint8_t spiTx = cmd;
 
 	ADS125X_CS(ads, 1);
@@ -237,14 +238,10 @@ uint8_t ADS125X_CMD_Send(ADS125X_t *ads, uint8_t cmd) {
  * @param  p_chan positive analog input
  * @see    Datasheet p. 31 MUX : Input Multiplexer Control Register (Address 01h)
  */
-
-/** @note not used -> reduce code size */
-/*
  void ADS125X_Channel_Set(ADS125X_t *ads, int8_t channel)
  { 
- ADS125X_ChannelDiff_Set(ads, channel, ADS125X_MUXN_AINCOM); 
+	 ADS125X_ChannelDiff_Set(ads, channel, ADS125X_MUXN_AINCOM);
  }
- */
 
 /**
  * @brief  set internal multiplexer to differential input channel

@@ -25,7 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
 #include "ads1255.h"
-#include "2.476.101.01.BSP.h"   // Baord Support Package
+#include "2.476.101.01.BSP.h"   // Board Support Package
 #include "scpi/scpi.h"
 #include "scpi-def.h"
 /* USER CODE END Includes */
@@ -61,6 +61,8 @@ char rx;
 ADS1255_DMA_State_t ads1256_state = DMA_STATE_Ready;
 ADS1255_DMA_State_t ads1255_state = DMA_STATE_Ready;
 int32_t adsCode;
+uint8_t dmaRx1[3];
+uint8_t dmaRx2[3];
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -79,10 +81,6 @@ extern UART_HandleTypeDef huart3;
 extern MAX5717_t dac1;
 extern ADS125X_t adcv;
 extern ADS125X_t adci;
-
-extern volatile uint8_t dmaDacTx[];
-extern volatile uint16_t dmaPtr;
-extern const uint16_t dmaBufferSize;
 
 extern scpi_t scpi_context;
 extern volatile CurveTracer_State_t deviceState;
@@ -354,7 +352,7 @@ void USART3_IRQHandler(void)
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);
   /* USER CODE BEGIN USART3_IRQn 1 */
-	__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // must be enabled again
+  __HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // must be enabled again !
 
   /* USER CODE END USART3_IRQn 1 */
 }
@@ -493,7 +491,6 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 	 * for VOLTAGE Sense ADC */
 	if(hspi == adcv.hspix){
 		if (is_config_done) {
-			static uint8_t dmaRx1[3];
 			static float volt1;
 			static int32_t adsCode1;
 
@@ -511,6 +508,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 				volt1 = ETA_CTGS_GetVoltageSense(volt1);
 				deviceState.adcInputVoltage = volt1; // save to device state
 				ads1255_state = DMA_STATE_Ready;
+				ETA_CTGS_ControllAlgorithm((CurveTracer_State_t*)&deviceState);
 				break;
 			default:
 				break;
@@ -522,14 +520,10 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 	 * for CURRENT Sense ADC */
 	if (hspi == adci.hspix) {
 		if (is_config_done) {
-			static uint8_t dmaRx[3];
-			static float volt2;
-
 			switch (ads1256_state) {
 			case DMA_STATE_Tx_MUX:
 				ads1256_state = DMA_STATE_Tx_WKUP;
-				for (uint16_t i = 0; i < 0xff; i++)
-					;
+				for (uint16_t i = 0; i < 0xff; i++);
 				/** send WAKEUP Command */
 				HAL_SPI_Transmit_DMA(adci.hspix,
 						(uint8_t*) &TxDMAchannelCycle[4 + TxDMABufferOffset],
@@ -538,8 +532,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 
 			case DMA_STATE_Tx_WKUP:
 				ads1256_state = DMA_STATE_Tx_RDATA;
-				for (uint16_t i = 0; i < 0xff; i++)
-					;
+				for (uint16_t i = 0; i < 0xff; i++);
 				/** send Request for Data Read */
 				HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*) &TxDMAchannelCycle[5 + TxDMABufferOffset], 1); // RDATA
 				break;
@@ -548,35 +541,53 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 				ads1256_state = DMA_STATE_Rx_ADC;
 				for (uint16_t i = 0; i < 128; i++);
 				/** Receive 3 bytes */
-				HAL_SPI_Receive_DMA(adci.hspix, (uint8_t*) &dmaRx[0], 3); // RDATA
-
-				adsCode = (dmaRx[0] << 16) | (dmaRx[1] << 8) | (dmaRx[2]);
-				if (adsCode & 0x800000)
-					adsCode |= 0xff000000;  // fix 2's complement
-				volt2 = ((float) adsCode * (2.0f * adci.vref))
-						/ (adci.pga * 8388607.0f);  // 0x7fffff = 8388607.0f
-
-				/** @todo Vhi and Vlo are swapped for some reason ?? */
-				/** @bug the ReceiveDMA should have a seperate state.
-				 * here the ReceiveDMA is called while the old samples are processed afterwards */
-
-				// shift buffer offset for other MUX bytes
-				if (TxDMABufferOffset == 0) {
-					TxDMABufferOffset = TxDMABufferOffsetStep;
-					// this means the just sampled value is for ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3 = Vlo
-					deviceState.adcVhi = volt2;
-				} else {
-					TxDMABufferOffset = 0;
-					// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
-					deviceState.adcVlo = volt2;
-					deviceState.adcInputCurrent = ETA_CTGS_GetCurrentSense(deviceState.adcVhi,
-							deviceState.adcVlo, RANGE_5mA);
-				}
-				ads1256_state = DMA_STATE_Ready;
-				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+				/** @bug the ReceiveDMA should have a separate state.
+				 * here the ReceiveDMA is called while the old samples are processed afterwards
+				 * the following line only arms the DMA for receive
+				 * but then processes the values from before */
+				HAL_SPI_Receive_DMA(adci.hspix, (uint8_t*) &dmaRx2[0], 3); // RDATA
 				break;
+			default:
+				ads1256_state = DMA_STATE_Ready;
+			}
+		}
+	}
+}
 
+/**
+ * @brief SPI DMA Receive Complete Interrupt
+ */
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
+	/** @note Part 3/3 of SPI DMA Transfer State Machine
+	 * for CURRENT Sense ADC */
+	if (hspi == adci.hspix) {
+		if (is_config_done) {
+			static float volt2;
+
+			switch (ads1256_state) {
 			case DMA_STATE_Rx_ADC:
+  				adsCode = (dmaRx2[0] << 16) | (dmaRx2[1] << 8) | (dmaRx2[2]);
+  				if (adsCode & 0x800000)
+  					adsCode |= 0xff000000;  // fix 2's complement
+  				volt2 = ((float) adsCode * (2.0f * adci.vref))
+  						/ (adci.pga * 8388607.0f);  // 0x7fffff = 8388607.0f
+
+  				// shift buffer offset for other MUX bytes
+  				if (TxDMABufferOffset == 0) {
+  					TxDMABufferOffset = TxDMABufferOffsetStep;
+  					// this means the just sampled value is for ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3 = Vlo
+  					deviceState.adcVlo = volt2;
+  				} else {
+  					TxDMABufferOffset = 0;
+  					// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
+  					deviceState.adcVhi = volt2;
+  					deviceState.adcInputCurrent =
+  							ETA_CTGS_GetCurrentSense((CurveTracer_State_t*)&deviceState,
+  									deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
+  				}
+  				ads1256_state = DMA_STATE_Ready;
+  				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+  				break;
 			default:
 				ads1256_state = DMA_STATE_Ready;
 			}

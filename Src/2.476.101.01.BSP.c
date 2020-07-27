@@ -208,7 +208,7 @@ void ETA_CTGS_OutputOff(CurveTracer_State_t *state) {
 	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 }
 
-float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range) {
+float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo, CurrentRange_t range) {
 	static float Vforce;
 	static float Vdut;
 	static float Rs;
@@ -229,12 +229,14 @@ float ETA_CTGS_GetCurrentSense(float Vhi, float Vlo, CurrentRange_t range) {
 
 	//Vforce = ( Vhi * ((V_DIV_R1 + V_DIV_R2) / V_DIV_R2 ) );
 	Vforce = (Vhi + VHI_OFFSET) * k12;
+	state->adcVforce = Vforce;
 	//Vforce = (Vforce*VFORCE_GAIN_corr) + VFORCE_OFFSET_corr;
 
 	/** @see Equation (3.4) */
 	//Vdut = ( Vlo * ((V_DIV_R3 + V_DIV_R4) / V_DIV_R4 ) );
 	//Vdut = (Vdut*VDUT_GAIN_corr) + VDUT_OFFSET_corr;
 	Vdut = (Vlo + VLO_OFFSET) * k34;
+	state->adcVdut = Vdut;
 
 	/** @see Equation (3.3) */
 	Ibias = (Vlo + VLO_OFFSET) / V_DIV_R4;
@@ -294,6 +296,46 @@ void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac, float
 	volt = volt / V_SOURCE_GAIN; // ideal gain
 	MAX5717_SetVoltage(dac, volt);
 	// printf("%.2f\n", volt);
+}
+
+/**
+ * @brief  simplified control system for voltage and current regulation
+ * @param  *state the curve tracer device state
+ */
+void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
+	static float gain = CONTROL_SYSTEM_GAIN;
+	static float error;
+	static float newVoltage;
+	//static float resistance;
+	//static float overshoot;
+
+
+
+	if (state->adcInputCurrent > state->maxOC) {
+		/*
+		overshoot = state->adcInputCurrent - state->maxOC;
+		overshoot /= state->maxOC;
+		newVoltage *= state->maxOC;
+		*/
+	} else if (state->adcInputCurrent < state->minOC) {
+		/*
+		overshoot = state->adcInputCurrent - state->minOC;
+		overshoot /= state->minOC;
+		newVoltage *= state->minOC;
+		*/
+	} else {
+		/** @note use Vdut voltage for control system because
+		 * if sense is not connected the source might run awas with the voltage */
+		error = (state->desiredVoltage - state->adcVdut);
+		newVoltage = state->dacOutputVoltage + (error * gain);
+
+	}
+	// boundry check / Limiter
+	if(newVoltage > V_SOURCE_POS_MAX)
+		newVoltage = V_SOURCE_POS_MAX;
+	if(newVoltage < V_SOURCE_NEG_MAX)
+		newVoltage = V_SOURCE_NEG_MAX;
+	ETA_CTGS_VoltageOutputSet(state, &dac1, newVoltage);
 }
 
 /**
