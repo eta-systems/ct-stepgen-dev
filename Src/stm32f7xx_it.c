@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    stm32f7xx_it.c
-  * @brief   Interrupt Service Routines.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    stm32f7xx_it.c
+ * @brief   Interrupt Service Routines.
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -24,6 +24,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "max5717.h"
+#include "ads1255.h"
+#include "2.476.101.01.BSP.h"   // Board Support Package
+#include "scpi/scpi.h"
+#include "scpi-def.h"
 /* USER CODE END Includes */
   
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
- 
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,7 +57,12 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+char rx;
+ADS1255_DMA_State_t ads1256_state = DMA_STATE_Ready;
+ADS1255_DMA_State_t ads1255_state = DMA_STATE_Ready;
+int32_t adsCode;
+uint8_t dmaRx1[3];
+uint8_t dmaRx2[3];
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -70,9 +79,17 @@ extern TIM_HandleTypeDef htim5;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
 extern MAX5717_t dac1;
-extern volatile uint8_t dmaDacTx[];
-extern volatile uint16_t dmaPtr;
-extern const uint16_t dmaBufferSize;
+extern ADS125X_t adcv;
+extern ADS125X_t adci;
+
+extern scpi_t scpi_context;
+extern volatile CurveTracer_State_t deviceState;
+
+extern volatile uint8_t is_config_done;
+
+extern uint8_t TxDMAchannelCycle[];
+extern uint8_t TxDMABufferOffsetStep;
+extern uint8_t TxDMABufferOffset;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -232,6 +249,52 @@ void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
 
+	/** @note DRDY Falling Edge Interrupt
+	 * PF7 for SPI3 (Voltage)
+	 * PA9 for SPI1 (Current)
+	 * DRDY low signals that a new sample is ready to be read
+	 * for the current measurement, the channel also has to be switched
+	 */
+	if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_9)) {
+		/** @note DRDY for current ADC
+		 * only execute, when not changing channels
+		 */
+		if (is_config_done) {
+			switch (ads1256_state) {
+			case DMA_STATE_Ready:
+				ads1256_state = DMA_STATE_Tx_MUX;
+				for (uint16_t i = 0; i < 0xff; i++)
+					__NOP();
+				/** Send first 4 bytes for the MUX register */
+				HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*) &TxDMAchannelCycle[0 + TxDMABufferOffset], 4); // MUX
+				break;
+			default:
+				break;
+				ads1256_state = DMA_STATE_Ready;
+			}
+		}
+	}
+	if (__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_7)) {
+		/** @note DRDY for voltage ADC
+		 */
+		static uint8_t spiTmp;
+
+		if (is_config_done) {
+			switch (ads1256_state) {
+			case DMA_STATE_Ready:
+				spiTmp = ADS125X_CMD_RDATA;    // request Data read
+				ADS125X_CS(&adcv, 1);   // Chip Select
+				HAL_SPI_Transmit_DMA(adcv.hspix, &spiTmp, 1);
+				ads1255_state = DMA_STATE_Tx_RDATA;
+				break;
+			default:
+				break;
+				ads1256_state = DMA_STATE_Ready;
+			}
+		}
+		ETA_CTGS_VoltageOutputSet((CurveTracer_State_t*)&deviceState, &dac1, deviceState.dacOutputVoltage);
+
+	}
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
@@ -246,16 +309,7 @@ void EXTI9_5_IRQHandler(void)
 void TIM4_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM4_IRQn 0 */
-	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-	
-	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_RESET);
-	for(uint16_t i=0; i<128; i++);
-	HAL_SPI_Transmit_DMA(dac1.hspix, &dmaDacTx[3*dmaPtr], 3);
-	
-	dmaPtr++;
-	if(dmaPtr >= dmaBufferSize)
-		dmaPtr = 0;
-	
+
   /* USER CODE END TIM4_IRQn 0 */
   HAL_TIM_IRQHandler(&htim4);
   /* USER CODE BEGIN TIM4_IRQn 1 */
@@ -284,9 +338,21 @@ void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
 
+	/**
+	 * @note USART (SCPI) Interface Rx Interrupt
+	 * this function is executed for each byte/char entering the USART3 Bus
+	 * the char can be directly forwarded to the SCPI_Input()
+	 * the SCPI library has a buffer and automatically detects complete command sequences
+	 */
+	if (__HAL_UART_GET_IT_SOURCE(&huart3, UART_IT_RXNE) == SET) {
+		HAL_UART_Receive_IT(&huart3, (uint8_t*) &rx, 1); // receive the single char in non-blocking mode
+		SCPI_Input(&scpi_context, &rx, 1);
+	}
+
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);
   /* USER CODE BEGIN USART3_IRQn 1 */
+  __HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE);  // must be enabled again !
 
   /* USER CODE END USART3_IRQn 1 */
 }
@@ -354,17 +420,18 @@ void DMA2_Stream1_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA2_Stream1_IRQn 0 */
 	// SPI4 DMA Complete
-	
-	for(uint16_t i=0; i<0x1fff; i++);
+	/**
+	 * @note DAC DMA Handler. (Part 2/2)
+	 * this interrupt handler is executed on DMA Tx Complete
+	 * here the CS pin and the LATCH pin need to be toggled
+	 */
+	for (uint16_t i = 0; i < 0x1fff; i++);  // delay
 	HAL_GPIO_WritePin(dac1.csPort, dac1.csPin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-	
+
+	// latch sample to DAC output
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_RESET);
-	for(uint16_t i=0; i<128;  i++);
+	for (uint16_t i = 0; i < 128; i++);    // delay
 	HAL_GPIO_WritePin(dac1.latchPort, dac1.latchPin, GPIO_PIN_SET);
-	
-	
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
   /* USER CODE END DMA2_Stream1_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi4_tx);
@@ -416,6 +483,116 @@ void SPI4_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+/**
+ * @brief SPI DMA Transmit Complete Interrupt
+ */
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+	/** @note Part 2/2 of SPI DMA Transfer State Machine
+	 * for VOLTAGE Sense ADC */
+	if(hspi == adcv.hspix){
+		if (is_config_done) {
+			static float volt1;
+			static int32_t adsCode1;
 
+			switch(ads1255_state){
+			case DMA_STATE_Tx_RDATA:
+				HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+				HAL_SPI_Receive_DMA(adcv.hspix, (uint8_t*) &dmaRx1[0], 3); // RDATA
+				adsCode1 = (dmaRx1[0] << 16) | (dmaRx1[1] << 8) | (dmaRx1[2]);
+				if (adsCode1 & 0x800000)
+					adsCode1 |= 0xff000000;  // fix 2's complement
+				ADS125X_ADC_Code2Volt(&adcv, &adsCode1, &volt1, 1);
+				volt1 *= 2.0f;
+				/** @bug voltage is wrong by a factor of 2 - why? */
+				// printf("%.4f\t", pVolt);
+				volt1 = ETA_CTGS_GetVoltageSense(volt1);
+				deviceState.adcInputVoltage = volt1; // save to device state
+				ads1255_state = DMA_STATE_Ready;
+				ETA_CTGS_ControllAlgorithm((CurveTracer_State_t*)&deviceState);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	/** @note Part 2/2 of SPI DMA Transfer State Machine
+	 * for CURRENT Sense ADC */
+	if (hspi == adci.hspix) {
+		if (is_config_done) {
+			switch (ads1256_state) {
+			case DMA_STATE_Tx_MUX:
+				ads1256_state = DMA_STATE_Tx_WKUP;
+				for (uint16_t i = 0; i < 0xff; i++);
+				/** send WAKEUP Command */
+				HAL_SPI_Transmit_DMA(adci.hspix,
+						(uint8_t*) &TxDMAchannelCycle[4 + TxDMABufferOffset],
+						1); // WAKEUP
+				break;
+
+			case DMA_STATE_Tx_WKUP:
+				ads1256_state = DMA_STATE_Tx_RDATA;
+				for (uint16_t i = 0; i < 0xff; i++);
+				/** send Request for Data Read */
+				HAL_SPI_Transmit_DMA(adci.hspix, (uint8_t*) &TxDMAchannelCycle[5 + TxDMABufferOffset], 1); // RDATA
+				break;
+
+			case DMA_STATE_Tx_RDATA:
+				ads1256_state = DMA_STATE_Rx_ADC;
+				for (uint16_t i = 0; i < 128; i++);
+				/** Receive 3 bytes */
+				/** @bug the ReceiveDMA should have a separate state.
+				 * here the ReceiveDMA is called while the old samples are processed afterwards
+				 * the following line only arms the DMA for receive
+				 * but then processes the values from before */
+				HAL_SPI_Receive_DMA(adci.hspix, (uint8_t*) &dmaRx2[0], 3); // RDATA
+				break;
+			default:
+				ads1256_state = DMA_STATE_Ready;
+			}
+		}
+	}
+}
+
+/**
+ * @brief SPI DMA Receive Complete Interrupt
+ */
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
+	/** @note Part 3/3 of SPI DMA Transfer State Machine
+	 * for CURRENT Sense ADC */
+	if (hspi == adci.hspix) {
+		if (is_config_done) {
+			static float volt2;
+
+			switch (ads1256_state) {
+			case DMA_STATE_Rx_ADC:
+  				adsCode = (dmaRx2[0] << 16) | (dmaRx2[1] << 8) | (dmaRx2[2]);
+  				if (adsCode & 0x800000)
+  					adsCode |= 0xff000000;  // fix 2's complement
+  				volt2 = ((float) adsCode * (2.0f * adci.vref))
+  						/ (adci.pga * 8388607.0f);  // 0x7fffff = 8388607.0f
+
+  				// shift buffer offset for other MUX bytes
+  				if (TxDMABufferOffset == 0) {
+  					TxDMABufferOffset = TxDMABufferOffsetStep;
+  					// this means the just sampled value is for ADS125X_MUXP_AIN2 | ADS125X_MUXN_AIN3 = Vlo
+  					deviceState.adcVlo = volt2;
+  				} else {
+  					TxDMABufferOffset = 0;
+  					// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
+  					deviceState.adcVhi = volt2;
+  					deviceState.adcInputCurrent =
+  							ETA_CTGS_GetCurrentSense((CurveTracer_State_t*)&deviceState,
+  									deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
+  				}
+  				ads1256_state = DMA_STATE_Ready;
+  				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+  				break;
+			default:
+				ads1256_state = DMA_STATE_Ready;
+			}
+		}
+	}
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
