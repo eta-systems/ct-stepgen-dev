@@ -42,10 +42,11 @@
 
 #define SCPI_INPUT_BUFFER_LENGTH 256
 #define SCPI_ERROR_QUEUE_SIZE 17
-#define SCPI_IDN1 "ETA-SYSTEMS"
-#define SCPI_IDN2 "STEP-GENERATOR"
-#define SCPI_IDN3 NULL
-#define SCPI_IDN4 "2020-08"
+
+#define SCPI_IDN1 "ETA-SYSTEMS"    /* Manufacturer */
+#define SCPI_IDN2 "STEP-GENERATOR" /* Model Number */
+#define SCPI_IDN3 "00001"          /* Serial Number */
+#define SCPI_IDN4 "2020-08"        /* Firmware Revision */
 
 extern const scpi_command_t scpi_commands[];
 extern scpi_interface_t scpi_interface;

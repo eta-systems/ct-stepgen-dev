@@ -306,29 +306,22 @@ void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
 	static float gain = CONTROL_SYSTEM_GAIN;
 	static float error;
 	static float newVoltage;
-	//static float resistance;
+	static float conductance;
+	static float resistance;
 	//static float overshoot;
 
-
-
-	if (state->adcInputCurrent > state->maxOC) {
-		/*
-		overshoot = state->adcInputCurrent - state->maxOC;
-		overshoot /= state->maxOC;
-		newVoltage *= state->maxOC;
-		*/
-	} else if (state->adcInputCurrent < state->minOC) {
-		/*
-		overshoot = state->adcInputCurrent - state->minOC;
-		overshoot /= state->minOC;
-		newVoltage *= state->minOC;
-		*/
+	/* current regulation mode */
+	if ( fabsf(state->adcInputCurrent) > (state->maxOC * 0.7f)) {
+		// in overcurrent mode, calculate voltage as if the point on the trace is from a linear DUT (resistance)
+		resistance = state->adcVdut / state->adcInputCurrent ;
+		error = - resistance * (state->adcInputCurrent - state->maxOC);
+		newVoltage = state->dacOutputVoltage + (error * gain);
+	/* voltage regulation mode */
 	} else {
 		/** @note use Vdut voltage for control system because
-		 * if sense is not connected the source might run awas with the voltage */
+		 * if sense is not connected the source might run away with the voltage */
 		error = (state->desiredVoltage - state->adcVdut);
 		newVoltage = state->dacOutputVoltage + (error * gain);
-
 	}
 	// boundry check / Limiter
 	if(newVoltage > V_SOURCE_POS_MAX)

@@ -258,10 +258,10 @@ const scpi_command_t scpi_commands[] = {
     {.pattern = "SYSTem:VERSion?",      .callback = SCPI_SystemVersionQ,},
 
     /* DMM */
-    {.pattern = "MEASure:VOLTage[:DC]?", .callback = scpi_etaCT_MeasureVoltageQ,},
-    {.pattern = "MEASure:CURRent[:DC]?", .callback = scpi_etaCT_MeasureCurrentQ,},
-    {.pattern = "CURRent:RANGe",         .callback = scpi_etaCT_RangeCurrent,},
-    {.pattern = "CURRent:RANGe?",        .callback = scpi_etaCT_RangeCurrentQ,},
+    {.pattern = "MEASure:VOLTage[:DC]?",             .callback = scpi_etaCT_MeasureVoltageQ,},
+    {.pattern = "MEASure:CURRent[:DC]?",             .callback = scpi_etaCT_MeasureCurrentQ,},
+    {.pattern = "SENSe:CURRent[:DC]:RANGe[:UPPer]",  .callback = scpi_etaCT_RangeCurrent,},
+    {.pattern = "SENSe:CURRent[:DC]:RANGe[:UPPer]?", .callback = scpi_etaCT_RangeCurrentQ,},
     /* {.pattern = "MEASure:RESistance?", .callback = SCPI_StubQ,}, */
 
 	/* SOURCE */
@@ -269,7 +269,7 @@ const scpi_command_t scpi_commands[] = {
     {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
     {.pattern = "SOURce:CURRent[:LIMit]",  .callback = scpi_etaCT_SetCurrent,},
     {.pattern = "SOURce:CURRent[:LIMit]?", .callback = scpi_etaCT_SetCurrentQ,},
-    {.pattern = "SOURce:OFF",              .callback = scpi_etaCT_RangeCurrentOff,},
+    {.pattern = "OUTput:OFF",              .callback = scpi_etaCT_RangeCurrentOff,},  // this should be a parameter, not a command
 
     SCPI_CMD_LIST_END
 };
