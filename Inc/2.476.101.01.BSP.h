@@ -46,6 +46,8 @@ extern "C" {
 #define SAMPLINGRATE_VOLTAGE (ADS125X_DRATE_50SPS)
 
 #define CONTROL_SYSTEM_GAIN (0.5f)
+#define _VOLT_Ku (1.3f)
+#define _VOLT_Pu (0.150f)
 
 /* Voltage References */
 #define V_REF_LM4140  (2.4985f)  /** @see Messprotokoll: MEASVREF20200717 */
@@ -98,25 +100,10 @@ typedef enum {
 	RANGE_OFF
 } CurrentRange_t;
 
-/* Instrument State / Status */
-typedef struct {
-	float desiredVoltage;
-	float dacOutputVoltage;
-	float dacOutputCurrent;
-	float adcInputVoltage;
-	float adcInputCurrent;
-	float adcVhi;
-	float adcVlo;
-	float adcVforce;
-	float adcVdut;
-	
-	float maxOC;
-	float minOC;
-	float maxOV;
-	float minOV;
-	
-	CurrentRange_t current_range;
-} CurveTracer_State_t;
+typedef enum {
+	PID_MODE_VOLTAGE,
+	PID_MODE_CURRENT
+} PID_MODE_t;
 
 typedef enum {
 	DMA_STATE_Ready,
@@ -135,6 +122,30 @@ typedef enum {
 	CT_ERROR_OTHER = 16
 } CT_StatusTypeDef;
 
+/* Instrument State / Status */
+typedef struct {
+	float desiredVoltage;
+	float desiredCurrent;
+	float dacOutputVoltage;
+	float dacOutputCurrent;
+	float adcInputVoltage;
+	float adcInputCurrent;
+	float adcVhi;
+	float adcVlo;
+	float adcVforce;
+	float adcVdut;
+	
+	PID_MODE_t pidMode;
+	uint8_t resetPid;
+
+	float maxOC;
+	float minOC;
+	float maxOV;
+	float minOV;
+	
+	CurrentRange_t current_range;
+} CurveTracer_State_t;
+
 /* Init */
 void ETA_CTGS_InitDAC(void);
 void ETA_CTGS_InitADC(void);
@@ -142,7 +153,7 @@ void ETA_CTGS_Init(CurveTracer_State_t *state);
 /* Current Sense */
 void  ETA_CTGS_OutputOff        (CurveTracer_State_t *state);
 void  ETA_CTGS_CurrentRangeSet  (CurveTracer_State_t *state, CurrentRange_t range);
-float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo, CurrentRange_t range);
+float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo);
 /* Voltage Sense */
 float ETA_CTGS_GetVoltageSense  (float vadc);
 /* Source (DAC) */

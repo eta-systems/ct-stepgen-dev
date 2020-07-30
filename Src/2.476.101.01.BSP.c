@@ -153,6 +153,8 @@ void ETA_CTGS_Init(CurveTracer_State_t *state) {
 	state->minOV = -5.100f;
 
 	state->current_range = RANGE_OFF;
+	state->pidMode = PID_MODE_VOLTAGE;
+	state->resetPid = 1;
 
 	ETA_CTGS_OutputOff(state);  // turn Ranging relais off
 
@@ -182,7 +184,7 @@ void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range) 
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
 		HAL_GPIO_WritePin(R5mA_ON_GPIO_Port, R5mA_ON_Pin, GPIO_PIN_RESET);
-	} else {
+	} else if (range == RANGE_2500mA) {
 		state->current_range = range;
 		HAL_GPIO_WritePin(R25A_ON_GPIO_Port, R25A_ON_Pin, GPIO_PIN_SET); // turn on
 		HAL_Delay(50);
@@ -208,7 +210,7 @@ void ETA_CTGS_OutputOff(CurveTracer_State_t *state) {
 	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 }
 
-float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo, CurrentRange_t range) {
+float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo) {
 	static float Vforce;
 	static float Vdut;
 	static float Rs;
@@ -218,7 +220,7 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo,
 	static float k12 = V_DIV_K12;
 	static float k34 = V_DIV_K34;
 
-	if (range == RANGE_5mA) {
+	if (state->current_range == RANGE_5mA) {
 		Rs = RS_5 + RS_5_corr;
 	} else {
 		Rs = RS_2500 + RS_2500_corr;
@@ -260,6 +262,7 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo,
 			Vdut / Idut, 1000 * Vdut * Idut);
 #endif
 
+	state->adcInputCurrent = Idut;
 	return Idut;
 }
 
@@ -301,34 +304,72 @@ void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac, float
 /**
  * @brief  simplified control system for voltage and current regulation
  * @param  *state the curve tracer device state
+ * @note   Everything in here is trial and error
+ *
  */
 void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
-	static float gain = CONTROL_SYSTEM_GAIN;
-	static float error;
-	static float newVoltage;
-	static float conductance;
-	static float resistance;
-	//static float overshoot;
+	static float Kp = 0.0f, Ki = 0.0f, Kd = 0.0f;
 
-	/* current regulation mode */
-	if ( fabsf(state->adcInputCurrent) > (state->maxOC * 0.7f)) {
-		// in overcurrent mode, calculate voltage as if the point on the trace is from a linear DUT (resistance)
-		resistance = state->adcVdut / state->adcInputCurrent ;
-		error = - resistance * (state->adcInputCurrent - state->maxOC);
-		newVoltage = state->dacOutputVoltage + (error * gain);
-	/* voltage regulation mode */
-	} else {
-		/** @note use Vdut voltage for control system because
-		 * if sense is not connected the source might run away with the voltage */
-		error = (state->desiredVoltage - state->adcVdut);
-		newVoltage = state->dacOutputVoltage + (error * gain);
+	static float iteration_time = 1.0f/50.0f;
+	static float newOutput;
+
+	static float error = 0, error_prior = 0;
+	static float integral = 0, integral_prior = 0;
+	static float derivative = 0;
+
+	if(state->resetPid){
+		state->resetPid = 0;
+		error = 0;
+		error_prior = 0;
+		integral = 0;
+		integral_prior = 0;
+		if(state->pidMode == PID_MODE_VOLTAGE){
+			static float vKp = 0.1f;
+			static float vKi = 5.0f;
+			static float vKd = 0.0f;
+			Kp = vKp;
+			Ki = vKi;
+			Kd = vKd;
+		} else {
+			static float iKp = 0.1f;
+			static float iKd = 0.0f;
+			Kp = iKp;
+			if(state->current_range == RANGE_5mA)
+				Ki = 8000.0f;
+			else
+				Ki = 20.0f;
+			Kd = iKd;
+		}
 	}
+
+	if(state->pidMode == PID_MODE_VOLTAGE){
+		error = state->desiredVoltage - state->adcVforce;   // Vforce is always present. Vdut is after the relay
+	} else {
+		error = state->desiredCurrent - state->adcInputCurrent;
+		/*
+		// artificial Slew Rate
+		if(error > 0.1)
+			error = 0.1;
+		if(error < -0.1)
+			error = -0.1;
+		*/
+	}
+
+	integral = integral_prior + error * iteration_time;
+	derivative = (error - error_prior) / iteration_time;
+
+	newOutput = Kp*error + Ki*integral + Kd*derivative;
+
+	error_prior = error;
+	integral_prior = integral;
+
 	// boundry check / Limiter
-	if(newVoltage > V_SOURCE_POS_MAX)
-		newVoltage = V_SOURCE_POS_MAX;
-	if(newVoltage < V_SOURCE_NEG_MAX)
-		newVoltage = V_SOURCE_NEG_MAX;
-	ETA_CTGS_VoltageOutputSet(state, &dac1, newVoltage);
+	if(newOutput > V_SOURCE_POS_MAX)
+		newOutput = V_SOURCE_POS_MAX;
+	if(newOutput < V_SOURCE_NEG_MAX)
+		newOutput = V_SOURCE_NEG_MAX;
+
+	ETA_CTGS_VoltageOutputSet(state, &dac1, newOutput);
 }
 
 /**

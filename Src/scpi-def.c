@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "main.h"
 #include "scpi/scpi.h"
 #include "scpi-def.h"
 //#include "max5717.h"
@@ -112,7 +113,10 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
 		return SCPI_RES_ERR;
 		// else: ignore and don't change the output
 	}
-
+	if(deviceState.pidMode != PID_MODE_VOLTAGE){
+		deviceState.resetPid = 1;
+		deviceState.pidMode = PID_MODE_VOLTAGE;
+	}
 	deviceState.desiredVoltage = (float) (param1);
 
 	/** @important Do not directly set the voltage.
@@ -128,7 +132,40 @@ static scpi_result_t scpi_etaCT_SetVoltage(scpi_t * context)
  */
 static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
 {
-	double param1 = (double) (deviceState.dacOutputVoltage);
+	double param1 = (double) (deviceState.desiredVoltage);
+	// SCPI_ResultDouble(context, param1); // is this the way to do it ??
+	printf("%.4f\r\n", param1);  // 100V / 20 Bit = 100uV resolution --> .4f
+	return SCPI_RES_OK;
+}
+
+/**
+ * @brief  save and set a desired output voltage
+ */
+static scpi_result_t scpi_etaCT_SetVoltageLim(scpi_t * context)
+{
+	double param1;
+	/* read first parameter if present */
+	if (!SCPI_ParamDouble(context, &param1, TRUE)) {
+		return SCPI_RES_ERR;
+	}
+
+	/* input boundry check */
+	if ((param1 > V_SOURCE_POS_MAX) || (param1 < V_SOURCE_NEG_MAX)) {
+		return SCPI_RES_ERR;
+		// else: ignore and don't change the output
+	}
+	deviceState.maxOV = (float) ( param1);
+	deviceState.minOV = (float) (-param1);
+
+	return SCPI_RES_OK;
+}
+
+/**
+ * @brief  read back the stored voltage
+ */
+static scpi_result_t scpi_etaCT_SetVoltageLimQ(scpi_t * context)
+{
+	double param1 = (double) (deviceState.maxOV);
 	// SCPI_ResultDouble(context, param1); // is this the way to do it ??
 	printf("%.4f\r\n", param1);  // 100V / 20 Bit = 100uV resolution --> .4f
 	return SCPI_RES_OK;
@@ -138,6 +175,50 @@ static scpi_result_t scpi_etaCT_SetVoltageQ(scpi_t * context)
  * @brief  save and set a desired output current (max current for OCP)
  */
 static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context)
+{
+	double param1;
+	/* read first parameter if present */
+	if (!SCPI_ParamDouble(context, &param1, TRUE)) {
+		return SCPI_RES_ERR;
+	}
+	/* input boundry check */
+	if(deviceState.current_range == RANGE_5mA){
+		if( (param1 > I_SOURCE_POS_MAX_5 ) || (param1 < I_SOURCE_NEG_MAX_5) )
+			return SCPI_RES_ERR;
+			// else: ignore and don't change the output
+	} else if (deviceState.current_range == RANGE_2500mA){
+		if( (param1 > I_SOURCE_POS_MAX_2500 ) || (param1 < I_SOURCE_NEG_MAX_2500) )
+			return SCPI_RES_ERR;
+			// else: ignore and don't change the output
+	}
+
+	/** @important Do not directly set the voltage.
+	 * the control system is taking care of this !!
+	 */
+	if(deviceState.pidMode != PID_MODE_CURRENT){
+			deviceState.resetPid = 1;
+			deviceState.pidMode = PID_MODE_CURRENT;
+		}
+	deviceState.desiredCurrent = (float) ( param1);
+
+	return SCPI_RES_OK;
+}
+
+/**
+ * @brief  read back the stored current
+ */
+static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context)
+{
+	double param1 = (double) (deviceState.desiredCurrent);
+	//SCPI_ResultDouble(context, param1);
+	printf("%.6f\r\n", param1);
+	return SCPI_RES_OK;
+}
+
+/**
+ * @brief  save and set a desired output current (max current for OCP)
+ */
+static scpi_result_t scpi_etaCT_SetCurrentLim(scpi_t * context)
 {
 	double param1;
 	/* read first parameter if present */
@@ -170,7 +251,7 @@ static scpi_result_t scpi_etaCT_SetCurrent(scpi_t * context)
 /**
  * @brief  read back the stored current
  */
-static scpi_result_t scpi_etaCT_SetCurrentQ(scpi_t * context)
+static scpi_result_t scpi_etaCT_SetCurrentLimQ(scpi_t * context)
 {
 	double param1 = (double) (deviceState.maxOC);
 	//SCPI_ResultDouble(context, param1);
@@ -267,8 +348,12 @@ const scpi_command_t scpi_commands[] = {
 	/* SOURCE */
     {.pattern = "SOURce:VOLTage[:LEVel]",  .callback = scpi_etaCT_SetVoltage,},
     {.pattern = "SOURce:VOLTage[:LEVel]?", .callback = scpi_etaCT_SetVoltageQ,},
-    {.pattern = "SOURce:CURRent[:LIMit]",  .callback = scpi_etaCT_SetCurrent,},
-    {.pattern = "SOURce:CURRent[:LIMit]?", .callback = scpi_etaCT_SetCurrentQ,},
+    {.pattern = "SOURce:VOLTage:LIMit",  .callback = scpi_etaCT_SetVoltageLim,},
+    {.pattern = "SOURce:VOLTage:LIMit?", .callback = scpi_etaCT_SetVoltageLimQ,},
+    {.pattern = "SOURce:CURRent[:LEVel]",  .callback = scpi_etaCT_SetCurrent,},
+    {.pattern = "SOURce:CURRent[:LEVel]?", .callback = scpi_etaCT_SetCurrentQ,},
+    {.pattern = "SOURce:CURRent:LIMit",  .callback = scpi_etaCT_SetCurrentLim,},
+    {.pattern = "SOURce:CURRent:LIMit?", .callback = scpi_etaCT_SetCurrentLimQ,},
     {.pattern = "OUTput:OFF",              .callback = scpi_etaCT_RangeCurrentOff,},  // this should be a parameter, not a command
 
     SCPI_CMD_LIST_END

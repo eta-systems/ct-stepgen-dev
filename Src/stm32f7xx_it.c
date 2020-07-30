@@ -582,8 +582,7 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
   					// this means the just sampled value is for ADS125X_MUXP_AIN4 | ADS125X_MUXN_AIN5 = Vhi
   					deviceState.adcVhi = volt2;
   					deviceState.adcInputCurrent =
-  							ETA_CTGS_GetCurrentSense((CurveTracer_State_t*)&deviceState,
-  									deviceState.adcVhi, deviceState.adcVlo, RANGE_5mA);
+  							ETA_CTGS_GetCurrentSense((CurveTracer_State_t*)&deviceState, deviceState.adcVhi, deviceState.adcVlo);
   				}
   				ads1256_state = DMA_STATE_Ready;
   				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
