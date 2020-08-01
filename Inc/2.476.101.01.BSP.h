@@ -68,7 +68,7 @@ extern "C" {
 #define RS_5    (200.0f)   // Sense R in Ohms
 #define RS_2500 (0.4f)     // Sense R in Ohm
 #define RS_5_corr    (200.0f - 199.666f)  // calibrated correction value
-#define RS_2500_corr (0.0f)  // calibrated correction value
+#define RS_2500_corr (0.009932f)  /** @see Messprotokoll: IMEASCAL20200801 */
 
 #define VDUT_GAIN_corr     (1.001572695227f)    /** @see Messprotokoll: MEASVREF20200717 */
 #define VDUT_OFFSET_corr   (0.004608302344475f) /** @see Messprotokoll: MEASVREF20200717 */

@@ -86,8 +86,15 @@ uint8_t ADS125X_Init(ADS125X_t *ads, SPI_HandleTypeDef *hspi, uint8_t drate,
 	printf("IO   : %#.2x\n", tmp[0]);
 #endif
 
+#ifdef DEBUG_ADS1255
+	printf("selfcal\n");
+#endif
 	ADS125X_CMD_Send(ads, ADS125X_CMD_SELFCAL);
 	ADS125X_CS(ads, 0);
+
+#ifdef DEBUG_ADS1255
+	printf("wait\n");
+#endif
 	ADS125X_DRDY_Wait(ads);  // wait ADS1256 to settle after self calibration
 
 	return 0;

@@ -27,7 +27,7 @@
 /* USER CODE BEGIN PD */
 
 // #define ENABLE_BSP_DEBUG_PRINTF
-//#define ENABLE_BSP_VALUES_PRINTF
+// #define ENABLE_BSP_VALUES_PRINTF
 #define ENABLE_BSP_WATCHDOG_PRINTF
 
 /* USER CODE END PD */
@@ -261,7 +261,6 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 	printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f * Idut, Vdut,
 			Vdut / Idut, 1000 * Vdut * Idut);
 #endif
-
 	state->adcInputCurrent = Idut;
 	return Idut;
 }
@@ -305,7 +304,6 @@ void ETA_CTGS_VoltageOutputSet(CurveTracer_State_t *state, MAX5717_t *dac, float
  * @brief  simplified control system for voltage and current regulation
  * @param  *state the curve tracer device state
  * @note   Everything in here is trial and error
- *
  */
 void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
 	static float Kp = 0.0f, Ki = 0.0f, Kd = 0.0f;
