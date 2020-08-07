@@ -226,6 +226,7 @@ static scpi_result_t scpi_etaCT_SetCurrentLim(scpi_t * context)
 		return SCPI_RES_ERR;
 	}
 	/* input boundry check */
+	/*
 	if(deviceState.current_range == RANGE_5mA){
 		if( (param1 > I_SOURCE_POS_MAX_5 ) || (param1 < I_SOURCE_NEG_MAX_5) )
 			return SCPI_RES_ERR;
@@ -234,7 +235,7 @@ static scpi_result_t scpi_etaCT_SetCurrentLim(scpi_t * context)
 		if( (param1 > I_SOURCE_POS_MAX_2500 ) || (param1 < I_SOURCE_NEG_MAX_2500) )
 			return SCPI_RES_ERR;
 			// else: ignore and don't change the output
-	}
+	}*/
 	if(param1 < 0.0f){
 		return SCPI_RES_ERR;
 	}
@@ -265,7 +266,7 @@ static scpi_result_t scpi_etaCT_SetCurrentLimQ(scpi_t * context)
 static scpi_result_t scpi_etaCT_MeasureVoltageQ(scpi_t * context)
 {
 	//SCPI_ResultDouble(context, param1);
-	printf("%.5f\r\n", deviceState.adcInputVoltage);  // 100V / 24 Bit = 6uV ~ 10uV --> .5f
+	printf("%.5f\t%.5f\t%.5f\r\n", deviceState.adcInputVoltage, deviceState.adcVforce, deviceState.adcVdut);  // 100V / 24 Bit = 6uV ~ 10uV --> .5f
 	return SCPI_RES_OK;
 }
 
@@ -276,9 +277,17 @@ static scpi_result_t scpi_etaCT_MeasureCurrentQ(scpi_t * context)
 {
 	//SCPI_ResultDouble(context, param1);
 	if(deviceState.current_range == RANGE_2500mA){
+#ifdef USE_MOVING_AVERAGE
+		printf("%.7f\r\n", deviceState.Idut_average);  // LSB = 2.5uA --> .7f
+#else
 		printf("%.7f\r\n", deviceState.adcInputCurrent);  // LSB = 2.5uA --> .7f
+#endif
 	} else if (deviceState.current_range == RANGE_5mA) {
+#ifdef USE_MOVING_AVERAGE
+		printf("%.8f\r\n", deviceState.Idut_average);  // LSB = 2.5uA --> .7f
+#else
 		printf("%.8f\r\n", deviceState.adcInputCurrent);  // LSB = 50nA  --> .8f
+#endif
 	}
 	return SCPI_RES_OK;
 }
@@ -306,10 +315,17 @@ static scpi_result_t scpi_etaCT_RangeCurrentQ(scpi_t * context)
  *
  * Return SCPI_RES_OK
  */
-static scpi_result_t My_CoreTstQ(scpi_t * context) {
-
+static scpi_result_t My_CoreTstQ(scpi_t * context)
+{
 	SCPI_ResultInt32(context, 0);
+	return SCPI_RES_OK;
+}
 
+static scpi_result_t My_CoreRst(scpi_t * context)
+{
+	ETA_CTGS_OutputOff(&deviceState);   // turn off all outputs
+	HAL_Delay(50);
+	NVIC_SystemReset();
 	return SCPI_RES_OK;
 }
 
@@ -326,7 +342,7 @@ const scpi_command_t scpi_commands[] = {
     { .pattern = "*IDN?", .callback = SCPI_CoreIdnQ,},
     { .pattern = "*OPC", .callback = SCPI_CoreOpc,},
     { .pattern = "*OPC?", .callback = SCPI_CoreOpcQ,},
-    { .pattern = "*RST", .callback = SCPI_CoreRst,},
+    { .pattern = "*RST", .callback = My_CoreRst,},     // SCPI_CoreRst
     { .pattern = "*SRE", .callback = SCPI_CoreSre,},
     { .pattern = "*SRE?", .callback = SCPI_CoreSreQ,},
     { .pattern = "*STB?", .callback = SCPI_CoreStbQ,},

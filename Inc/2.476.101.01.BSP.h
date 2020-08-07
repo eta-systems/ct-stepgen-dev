@@ -41,6 +41,9 @@ extern "C" {
 #include "ads1255.h"
 
 /* SETTINGS */
+//#define USE_MOVING_AVERAGE
+#define MOVING_AVERAGE_N (20.0f)
+
 // current ADC measures two voltages --> real sampling rate is only half this setting
 #define SAMPLINGRATE_CURRENT (ADS125X_DRATE_100SPS)
 #define SAMPLINGRATE_VOLTAGE (ADS125X_DRATE_50SPS)
@@ -64,6 +67,11 @@ extern "C" {
 #define V_DIV_K34 (11.01784557f)    /** @see Messprotokoll: IMEASCAL20200724 */
 #define VHI_OFFSET (0.0002209328f)  /** @see Messprotokoll: IMEASCAL20200724 */
 #define VLO_OFFSET (0.0004493834f)  /** @see Messprotokoll: IMEASCAL20200724 */
+
+#define I_BIAS_GAIN   (1.030797405215f)
+#define I_BIAS_OFFSET (-0.0000007818993227929f)
+#define I_DUT_GAIN    (1.0026f)
+#define I_DUT_OFFSET  (-0.000003f)
 
 #define RS_5    (200.0f)   // Sense R in Ohms
 #define RS_2500 (0.4f)     // Sense R in Ohm
@@ -135,8 +143,14 @@ typedef struct {
 	float adcVforce;
 	float adcVdut;
 	
+	float Idut_previous;
+	float Idut_average;
+
 	PID_MODE_t pidMode;
 	uint8_t resetPid;
+
+	float meanVoltage;
+	float meanCurrent;
 
 	float maxOC;
 	float minOC;

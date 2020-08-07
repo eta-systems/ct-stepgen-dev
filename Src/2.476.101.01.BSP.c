@@ -242,6 +242,7 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 
 	/** @see Equation (3.3) */
 	Ibias = (Vlo + VLO_OFFSET) / V_DIV_R4;
+	Ibias = (Ibias * I_BIAS_GAIN ) + I_BIAS_OFFSET;
 	//Ibias = Vdut / (V_DIV_R4 + V_DIV_R3);
 
 	/** @see Equation (3.2) */
@@ -250,6 +251,19 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 
 	/** @see Equation (3.1) */
 	Idut = (Vshunt / Rs) - Ibias;
+	Idut = (Idut * I_DUT_GAIN) + I_DUT_OFFSET;
+
+
+#ifdef USE_MOVING_AVERAGE
+	static float avgIdut = 0.0f;
+	static float moving_avg_n = MOVING_AVERAGE_N;
+
+	avgIdut -= avgIdut/moving_avg_n;
+	avgIdut += Idut/moving_avg_n;
+	/** @see
+	 * https://stackoverflow.com/questions/12636613/how-to-calculate-moving-average-without-keeping-the-count-and-data-total
+	 * */
+#endif
 
 #ifdef ENABLE_BSP_VALUES_PRINTF
 	//printf("%.8f\t%.8f\n", Vforce, Vdut);
@@ -261,7 +275,7 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 	printf("%.5f mA, %.4f V, %.2f R, %.2f mW\n", 1000.0f * Idut, Vdut,
 			Vdut / Idut, 1000 * Vdut * Idut);
 #endif
-	state->adcInputCurrent = Idut;
+	// printf("%.7f\t%.10f\t%.7f\t%.7f\n", state->adcInputVoltage, Idut, Vdut, Vforce);
 	return Idut;
 }
 
@@ -341,7 +355,7 @@ void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
 	}
 
 	if(state->pidMode == PID_MODE_VOLTAGE){
-		error = state->desiredVoltage - state->adcVforce;   // Vforce is always present. Vdut is after the relay
+		error = state->desiredVoltage - state->adcInputVoltage; //state->adcVforce;   // Vforce is always present. Vdut is after the relay
 	} else {
 		error = state->desiredCurrent - state->adcInputCurrent;
 		/*
@@ -367,7 +381,13 @@ void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
 	if(newOutput < V_SOURCE_NEG_MAX)
 		newOutput = V_SOURCE_NEG_MAX;
 
-	ETA_CTGS_VoltageOutputSet(state, &dac1, newOutput);
+	if(state->pidMode == PID_MODE_VOLTAGE && (fabsf( ((state->desiredVoltage) - (state->adcInputVoltage))) < 0.01) ){
+		// do not regulate if voltage is accurate to 10mV
+		// to reduce ripple
+	} else {
+		ETA_CTGS_VoltageOutputSet(state, &dac1, newOutput);
+	}
+	ETA_CTGS_Watchdog(state);
 }
 
 /**
@@ -378,11 +398,39 @@ CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state)
 {
 	CT_StatusTypeDef status = CT_OK;
 
+	/* use a moving average to dampen peaks or "wrong" measurements due to noise */
+	static float vbuf[10];
+	static float ibuf[10];
+	static float meanCurrent = 0.0f;
+	static float meanVoltage = 0.0f;
+	static float n_avg = 10.0f;
+
+	for (uint8_t i = (uint8_t)n_avg - 1; i > 0; i--){
+	    vbuf[i] = vbuf[i - 1];
+	    ibuf[i] = ibuf[i - 1];
+	}
+	vbuf[0] = state->adcInputVoltage;
+	ibuf[0] = state->adcInputCurrent;
+	for (uint8_t i = 0; i<(uint8_t)n_avg; i++){
+		meanCurrent += ibuf[i];
+		meanVoltage += vbuf[i];
+	}
+	meanCurrent /= n_avg;
+	meanVoltage /= n_avg;
+
+	/* ist there a way to calculate moving average without loops and buffers ?? */
+	// meanCurrent = ( (n_avg - 1.0f) / n_avg ) + (state->adcInputCurrent / n_avg);
+	// meanVoltage = ( (n_avg - 1.0f) / n_avg ) + (state->adcInputVoltage / n_avg);
+	state->meanVoltage = meanVoltage;
+	state->meanCurrent = meanCurrent;
+
 	/* Voltages */
+	/*
 	if((state->adcVhi > 6.0f) || (state->adcVhi < -6.0f))
 		status |= CT_ERROR_VALUE;
 	if((state->adcVlo > 6.0f) || (state->adcVlo < -6.0f))
 		status |= CT_ERROR_VALUE;
+	*/
 
 	/*
 	if((state->adcVdut > V_SOURCE_POS_MAX) || (state->adcVdut < V_SOURCE_NEG_MAX)){
@@ -399,6 +447,9 @@ CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state)
 	*/
 
 	// voltage accross sense resistor
+
+
+	/*
 	if( fabsf(state->adcVdut - state->adcVforce) > 1.5f ){
 		status |= CT_ERROR_OC;
 		status |= CT_ERROR_VALUE;
@@ -406,35 +457,44 @@ CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state)
 		printf("[wdg] Vsense > 1.5V\n");
 #endif
 	}
+	*/
 
-	if( (state->adcInputVoltage > state->maxOV) || (state->adcInputVoltage < state->minOV) ){
+	if( (meanVoltage > state->maxOV) || (meanVoltage < state->minOV) ){
 		status |= CT_ERROR_OV;
 	}
 
 	if(state->current_range != RANGE_OFF){
-		if( (state->adcInputCurrent > state->maxOC) || (state->adcInputCurrent < state->minOC) ){
+		if( (meanCurrent > state->maxOC) || (meanCurrent < state->minOC) ){
 			status |= CT_ERROR_OC;
 		}
 	}
 
 	/* Handle Errors */
-	if(status | CT_ERROR_OC){
+
+	/*
+	if( (status & CT_ERROR_OC) ){
 		// turn off
 		ETA_CTGS_OutputOff(state);
+		state->desiredVoltage = 0.0f;
+		state->desiredCurrent = 0.0f;
 		ETA_CTGS_VoltageOutputSet(state, &dac1, 0.0f);
 #ifdef ENABLE_BSP_WATCHDOG_PRINTF
-		printf("[wdg] OC\n");
+		printf("[wdg] OC %.7f\n", meanCurrent);
 #endif
 	}
 
-	if(status | CT_ERROR_OV){
+	if( (status & CT_ERROR_OV) ){
 		// turn off
 		ETA_CTGS_OutputOff(state);
+		state->desiredVoltage = 0.0f;
+		state->desiredCurrent = 0.0f;
 		ETA_CTGS_VoltageOutputSet(state, &dac1, 0.0f);
 #ifdef ENABLE_BSP_WATCHDOG_PRINTF
-		printf("[wdg] OV\n");
+		printf("[wdg] OV %.3f\n", meanVoltage);
 #endif
 	}
+	*/
+
 
 	return status;
 }
