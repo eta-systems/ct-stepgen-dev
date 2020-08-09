@@ -137,7 +137,8 @@ void ETA_CTGS_InitADC(void) {
 }
 
 /**
- * @brief  initializes Curve Tracer State and pripherals
+ * @brief  initializes Curve Tracer State and peripherals
+ * @param  *state the curve tracer device state
  */
 void ETA_CTGS_Init(CurveTracer_State_t *state) {
 	// input values
@@ -170,6 +171,7 @@ void ETA_CTGS_Init(CurveTracer_State_t *state) {
 
 /**
  * @brief  turns on one of the ranging relays
+ * @param  *state the curve tracer device state
  * @param  range [RANGE_5mA, RANGE_2500mA]
  * @note   Care must be taken when using HAL_Delay(), this function provides accurate delay (in milliseconds)
  *         based on variable incremented in SysTick ISR. This implies that if HAL_Delay() is called from
@@ -194,6 +196,7 @@ void ETA_CTGS_CurrentRangeSet(CurveTracer_State_t *state, CurrentRange_t range) 
 
 /**
  * @brief  turns off all outut relays
+ * @param  *state the curve tracer device state
  * @note   Care must be taken when using HAL_Delay(), this function provides accurate delay (in milliseconds)
  *         based on variable incremented in SysTick ISR. This implies that if HAL_Delay() is called from
  *         a peripheral ISR process, then the SysTick interrupt must have higher priority (numerically lower)
@@ -210,6 +213,13 @@ void ETA_CTGS_OutputOff(CurveTracer_State_t *state) {
 	HAL_GPIO_WritePin(R25A_OFF_GPIO_Port, R25A_OFF_Pin, GPIO_PIN_RESET);
 }
 
+/**
+ * @brief  does all the calculations and calibration corrections for the current measurement
+ * @param  *state the curve tracer device state
+ * @param  Vhi the measurement value in Volts
+ * @param  Vlo the measurement value in Volts
+ * @todo   where is the Idut value stored in the state variable?
+ */
 float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo) {
 	static float Vforce;
 	static float Vdut;
@@ -253,7 +263,6 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 	Idut = (Vshunt / Rs) - Ibias;
 	Idut = (Idut * I_DUT_GAIN) + I_DUT_OFFSET;
 
-
 #ifdef USE_MOVING_AVERAGE
 	static float avgIdut = 0.0f;
 	static float moving_avg_n = MOVING_AVERAGE_N;
@@ -282,6 +291,7 @@ float ETA_CTGS_GetCurrentSense(CurveTracer_State_t *state, float Vhi, float Vlo)
 /**
  * @brief  calculates the real clamp voltage on the Sense input from the ADC voltage
  * @param  Vadc measured ADC voltage
+ * @todo   where is the value stored to the state variable?
  */
 float ETA_CTGS_GetVoltageSense(float vadc) {
 	vadc = (vadc * V_MEAS_ATTENUATION);
@@ -359,7 +369,7 @@ void ETA_CTGS_ControllAlgorithm(CurveTracer_State_t *state){
 	} else {
 		error = state->desiredCurrent - state->adcInputCurrent;
 		/*
-		// artificial Slew Rate
+		// Limiter: artificial Slew Rate
 		if(error > 0.1)
 			error = 0.1;
 		if(error < -0.1)
@@ -494,7 +504,6 @@ CT_StatusTypeDef ETA_CTGS_Watchdog(CurveTracer_State_t *state)
 #endif
 	}
 	*/
-
 
 	return status;
 }
